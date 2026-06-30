@@ -4,10 +4,11 @@ import { TokenPayload, TokenService } from "../../application/ports/token-servic
 export class JwtTokenService implements TokenService {
   constructor(
     private readonly secret: string,
-    private readonly expiresIn: SignOptions["expiresIn"],
+    private readonly expiresIn: string | number,
   ) {}
 
   sign(payload: TokenPayload): string {
-    return jwt.sign(payload, this.secret, { expiresIn: this.expiresIn });
+    const options = { expiresIn: this.expiresIn } as SignOptions;
+    return jwt.sign(payload, this.secret, options);
   }
 }
