@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { CreateNetwork } from "../../../application/network/create-network";
 import { DecideAccess } from "../../../application/network/decide-access";
+import { ListNetworks } from "../../../application/network/list-networks";
 import { ListPendingRequests } from "../../../application/network/list-pending-requests";
 import { RequestAccess } from "../../../application/network/request-access";
 
@@ -10,7 +11,17 @@ export class NetworkController {
     private readonly requestAccessUseCase: RequestAccess,
     private readonly listPendingUseCase: ListPendingRequests,
     private readonly decideAccessUseCase: DecideAccess,
+    private readonly listNetworksUseCase: ListNetworks,
   ) {}
+
+  list = async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const networks = await this.listNetworksUseCase.execute();
+      res.json(networks);
+    } catch (err) {
+      next(err);
+    }
+  };
 
   create = async (_req: Request, res: Response, next: NextFunction) => {
     try {

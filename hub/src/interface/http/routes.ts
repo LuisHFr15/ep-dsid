@@ -1,13 +1,59 @@
-import { Router } from "express";
+import { RequestHandler, Router } from "express";
 import { AuthController } from "./controllers/auth-controller";
+import { FileController } from "./controllers/file-controller";
+import { NetworkController } from "./controllers/network-controller";
 import { validateBody } from "./middleware/validate";
 import { credentialsSchema } from "./schemas/auth-schemas";
+import {
+  createNetworkSchema,
+  decideAccessSchema,
+  publishVersionSchema,
+} from "./schemas/network-schemas";
 
-export function buildRoutes(auth: AuthController): Router {
+export interface HttpDeps {
+  authController: AuthController;
+  networkController: NetworkController;
+  fileController: FileController;
+  authenticate: RequestHandler;
+}
+
+export function buildRoutes(deps: HttpDeps): Router {
   const router = Router();
+  const { authController, networkController, fileController, authenticate } = deps;
 
-  router.post("/register", validateBody(credentialsSchema), auth.register);
-  router.post("/auth", validateBody(credentialsSchema), auth.login);
+  router.post("/register", validateBody(credentialsSchema), authController.register);
+  router.post("/auth", validateBody(credentialsSchema), authController.login);
+
+  router.get("/networks", authenticate, networkController.list);
+  router.post(
+    "/networks",
+    authenticate,
+    validateBody(createNetworkSchema),
+    networkController.create,
+  );
+  router.post(
+    "/networks/:networkId/access-requests",
+    authenticate,
+    networkController.requestAccess,
+  );
+  router.get(
+    "/networks/:networkId/access-requests",
+    authenticate,
+    networkController.listPending,
+  );
+  router.post(
+    "/networks/:networkId/access-decisions",
+    authenticate,
+    validateBody(decideAccessSchema),
+    networkController.decide,
+  );
+  router.post(
+    "/networks/:networkId/versions",
+    authenticate,
+    validateBody(publishVersionSchema),
+    fileController.publish,
+  );
+  router.get("/networks/:networkId/file", authenticate, fileController.getCurrent);
 
   return router;
 }
