@@ -11,4 +11,9 @@ export class JwtTokenService implements TokenService {
     const options = { expiresIn: this.expiresIn } as SignOptions;
     return jwt.sign(payload, this.secret, options);
   }
+
+  verify(token: string): TokenPayload {
+    const decoded = jwt.verify(token, this.secret) as TokenPayload;
+    return { sub: decoded.sub, username: decoded.username };
+  }
 }
