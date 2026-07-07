@@ -1,11 +1,13 @@
 import { NextFunction, Request, Response } from "express";
 import { GetCurrentFile } from "../../../application/file/get-current-file";
+import { ListVersions } from "../../../application/file/list-versions";
 import { PublishVersion } from "../../../application/file/publish-version";
 
 export class FileController {
   constructor(
     private readonly publishVersionUseCase: PublishVersion,
     private readonly getCurrentFileUseCase: GetCurrentFile,
+    private readonly listVersionsUseCase: ListVersions,
   ) {}
 
   publish = async (req: Request, res: Response, next: NextFunction) => {
@@ -35,6 +37,18 @@ export class FileController {
         versionId,
       });
       res.json(resolved);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listVersions = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const dag = await this.listVersionsUseCase.execute({
+        networkId: String(req.params.networkId),
+        requesterId: res.locals.user.id,
+      });
+      res.json(dag);
     } catch (err) {
       next(err);
     }

@@ -58,6 +58,7 @@ export function buildRoutes(deps: HttpDeps): Router {
     fileController.publish,
   );
   router.get("/networks/:networkId/file", authenticate, fileController.getCurrent);
+  router.get("/networks/:networkId/versions", authenticate, fileController.listVersions);
 
   router.post("/heartbeat", authenticate, validateBody(heartbeatSchema), heartbeatController.register);
 

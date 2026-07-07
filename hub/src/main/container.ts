@@ -6,6 +6,7 @@ import { ListNetworks } from "../application/network/list-networks";
 import { ListPendingRequests } from "../application/network/list-pending-requests";
 import { RequestAccess } from "../application/network/request-access";
 import { GetCurrentFile } from "../application/file/get-current-file";
+import { ListVersions } from "../application/file/list-versions";
 import { PublishVersion } from "../application/file/publish-version";
 import { RegisterHeartbeat } from "../application/presence/register-heartbeat";
 import { Config } from "../infrastructure/config/env";
@@ -57,6 +58,11 @@ export function buildContainer(config: Config): HttpDeps {
     membershipRepository,
     versionRepository,
   );
+  const listVersions = new ListVersions(
+    networkRepository,
+    membershipRepository,
+    versionRepository,
+  );
   const registerHeartbeat = new RegisterHeartbeat(
     networkRepository,
     membershipRepository,
@@ -71,7 +77,7 @@ export function buildContainer(config: Config): HttpDeps {
     decideAccess,
     listNetworks,
   );
-  const fileController = new FileController(publishVersion, getCurrentFile);
+  const fileController = new FileController(publishVersion, getCurrentFile, listVersions);
   const heartbeatController = new HeartbeatController(registerHeartbeat);
 
   return {
