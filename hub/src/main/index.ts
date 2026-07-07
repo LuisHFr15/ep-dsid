@@ -4,8 +4,8 @@ import { buildServer } from "../interface/http/server";
 import { buildContainer } from "./container";
 
 const config = loadConfig();
-const { authController } = buildContainer(config);
-const app = buildServer(authController);
+const controllers = buildContainer(config);
+const app = buildServer(controllers);
 
 app.listen(config.port, () => {
   console.log(`hub listening on ${config.port}`);
