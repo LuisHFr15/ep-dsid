@@ -1,0 +1,16 @@
+{
+  "name": "client",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/cli/main.ts",
+    "commands": "tsx src/cli/runCommands.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

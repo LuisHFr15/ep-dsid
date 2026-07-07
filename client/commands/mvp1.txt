@@ -1,0 +1,8 @@
+# Cliente MVP 2
+# Valida listagem de arquivos no hub.
+
+health
+files:list
+files:get 3d414484-2cff-47cc-935b-a546e2ee3f3e
+files:publish arquivo-demo.txt 1000 fake-hash-demo peer-a
+files:list
