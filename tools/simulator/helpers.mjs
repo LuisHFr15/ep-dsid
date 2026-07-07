@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 const EMPTY_ACTION = "-";
+const SIM_PASSWORD = "sim-pass";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -17,14 +18,6 @@ export function createRandomTables({
   const actionTable = createEmptyTable(peers.length, ticks);
   const heartbeatTable = createEmptyTable(peers.length, ticks);
 
-  /*
-    Setup fixo mínimo:
-    - peer-1 faz health
-    - peer-1 anuncia file1
-    - peer-1 anuncia file2
-
-    Isso garante que D1, D2, HB1 e HB2 tenham arquivos existentes.
-  */
   actionTable[0][0] = "H";
   actionTable[0][1] = "A1";
   actionTable[0][2] = "A2";
@@ -36,14 +29,6 @@ export function createRandomTables({
     }
   }
 
-  /*
-    Garante alguns eventos úteis para o teste.
-    Mesmo sendo aleatório, queremos forçar algumas situações importantes:
-    - listagem depois dos announces
-    - detalhes dos dois arquivos
-    - vários heartbeats simultâneos em file1 para passar do threshold
-    - alguns heartbeats em file2 para provar separação por arquivo
-  */
   if (ticks > setupTicks + 1 && peers.length >= 2) {
     actionTable[1][setupTicks] = "L";
   }
@@ -55,7 +40,6 @@ export function createRandomTables({
 
   if (ticks > setupTicks + 4 && peers.length >= 5) {
     const burstTick = setupTicks + 3;
-
     for (let peerIndex = 0; peerIndex < Math.min(5, peers.length); peerIndex++) {
       heartbeatTable[peerIndex][burstTick] = "HB1";
     }
@@ -63,15 +47,11 @@ export function createRandomTables({
 
   if (ticks > setupTicks + 5 && peers.length >= 7) {
     const file2Tick = setupTicks + 4;
-
     heartbeatTable[5][file2Tick] = "HB2";
     heartbeatTable[6][file2Tick] = "HB2";
   }
 
-  return {
-    actionTable,
-    heartbeatTable,
-  };
+  return { actionTable, heartbeatTable };
 }
 
 function createEmptyTable(rows, columns) {
@@ -81,12 +61,7 @@ function createEmptyTable(rows, columns) {
 }
 
 function createSeededRandom(seed) {
-  /*
-    Gerador simples e reproduzível.
-    Não é para criptografia; é só para simulação determinística.
-  */
   let state = seed >>> 0;
-
   return function random() {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
@@ -98,10 +73,8 @@ function pickWeighted(weights, random) {
   const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
 
   let value = random() * total;
-
   for (const [action, weight] of entries) {
     value -= weight;
-
     if (value <= 0) {
       return action;
     }
@@ -114,17 +87,19 @@ export async function runScenario(scenario) {
   const context = {
     scenario,
     files: {},
+    tokens: {},
     results: [],
     failures: [],
   };
 
   printScenarioHeader(scenario);
 
+  await authenticatePeers(context);
+
   const totalTicks = getTotalTicks(scenario);
 
   for (let tick = 0; tick < totalTicks; tick++) {
     const timeLabel = `${tick * scenario.tickMs}ms`;
-
     console.log(`\n=== Tick ${tick} (${timeLabel}) ===`);
 
     const scheduledActions = collectActionsForTick(scenario, tick);
@@ -147,12 +122,33 @@ export async function runScenario(scenario) {
   printReport(context);
 }
 
+async function authenticatePeers(context) {
+  console.log("\nAutenticando peers (register + login)...");
+
+  for (const peer of context.scenario.peers) {
+    await request(context.scenario.hubUrl, "/register", {
+      method: "POST",
+      body: { user: peer, password: SIM_PASSWORD },
+    });
+
+    const login = await request(context.scenario.hubUrl, "/auth", {
+      method: "POST",
+      body: { user: peer, password: SIM_PASSWORD },
+    });
+
+    if (login.status !== 200 || !login.body?.jwt) {
+      throw new Error(`falha ao autenticar ${peer}: status ${login.status}`);
+    }
+
+    context.tokens[peer] = login.body.jwt;
+  }
+
+  console.log(`${context.scenario.peers.length} peers autenticados.`);
+}
+
 function getTotalTicks(scenario) {
   const actionTicks = Math.max(...scenario.actionTable.map((row) => row.length));
-  const heartbeatTicks = Math.max(
-    ...scenario.heartbeatTable.map((row) => row.length)
-  );
-
+  const heartbeatTicks = Math.max(...scenario.heartbeatTable.map((row) => row.length));
   return Math.max(actionTicks, heartbeatTicks);
 }
 
@@ -163,25 +159,14 @@ function collectActionsForTick(scenario, tick) {
     const peer = scenario.peers[peerIndex];
 
     const actionCode = scenario.actionTable?.[peerIndex]?.[tick] ?? EMPTY_ACTION;
-    const heartbeatCode =
-      scenario.heartbeatTable?.[peerIndex]?.[tick] ?? EMPTY_ACTION;
+    const heartbeatCode = scenario.heartbeatTable?.[peerIndex]?.[tick] ?? EMPTY_ACTION;
 
     for (const code of expandCell(actionCode)) {
-      scheduled.push({
-        source: "actionTable",
-        tick,
-        peer,
-        code,
-      });
+      scheduled.push({ source: "actionTable", tick, peer, code });
     }
 
     for (const code of expandCell(heartbeatCode)) {
-      scheduled.push({
-        source: "heartbeatTable",
-        tick,
-        peer,
-        code,
-      });
+      scheduled.push({ source: "heartbeatTable", tick, peer, code });
     }
   }
 
@@ -205,7 +190,6 @@ function expandCell(cell) {
 
 async function executeScheduledAction(scheduledAction, context) {
   const { tick, peer, code, source } = scheduledAction;
-
   const label = `[tick ${tick}] [${peer}] [${code}]`;
 
   try {
@@ -232,19 +216,10 @@ async function executeScheduledAction(scheduledAction, context) {
       printFailure(label, validationErrors, result.response.body);
     }
   } catch (error) {
-    const record = {
-      ok: false,
-      tick,
-      peer,
-      code,
-      source,
-      error,
-    };
-
+    const record = { ok: false, tick, peer, code, source, error };
     context.results.push(record);
     context.failures.push(record);
-
-    console.log(`❌ ${label} erro inesperado`);
+    console.log(`FAIL ${label} erro inesperado`);
     console.log(`   ${error.message}`);
   }
 }
@@ -257,37 +232,19 @@ async function executeAction(scheduledAction, context) {
   }
 
   if (code === "L") {
-    return executeList(context);
+    return executeList(peer, context);
   }
 
   if (code.startsWith("A")) {
-    const fileKey = fileKeyFromCode(code);
-    return executeAnnounce(fileKey, context);
+    return executeAnnounce(fileKeyFromCode(code), peer, context);
   }
 
   if (code.startsWith("D")) {
-    const fileKey = fileKeyFromCode(code);
-    return executeDetails(fileKey, context);
+    return executeDetails(fileKeyFromCode(code), peer, context);
   }
 
   if (code.startsWith("HB")) {
-    const fileKey = fileKeyFromCode(code);
-    return executeHeartbeat({
-      fileKey,
-      peer,
-      status: "online",
-      context,
-    });
-  }
-
-  if (code.startsWith("OFF")) {
-    const fileKey = fileKeyFromCode(code);
-    return executeHeartbeat({
-      fileKey,
-      peer,
-      status: "offline",
-      context,
-    });
+    return executeHeartbeat(fileKeyFromCode(code), peer, context);
   }
 
   throw new Error(`Ação desconhecida: ${code}`);
@@ -295,144 +252,128 @@ async function executeAction(scheduledAction, context) {
 
 function fileKeyFromCode(code) {
   const match = code.match(/\d+/);
-
   if (!match) {
     throw new Error(`Código de ação não possui número de arquivo: ${code}`);
   }
-
   return `file${match[0]}`;
 }
 
 async function executeHealth(context) {
   const response = await request(context.scenario.hubUrl, "/health");
-
-  return {
-    request: {
-      method: "GET",
-      path: "/health",
-    },
-    response,
-  };
+  return { request: { method: "GET", path: "/health" }, response };
 }
 
-async function executeAnnounce(fileKey, context) {
+async function executeAnnounce(fileKey, peer, context) {
   const fileConfig = context.scenario.files[fileKey];
-
   if (!fileConfig) {
     throw new Error(`Arquivo não configurado no cenário: ${fileKey}`);
   }
 
-  const fakeHash = randomUUID().replaceAll("-", "");
-
-  const body = {
+  const token = getToken(peer, context);
+  const createBody = {
     title: fileConfig.title,
-    description: fileConfig.description,
-    visibility: fileConfig.visibility ?? "public",
-    magnet_uri: `magnet:?xt=urn:btih:${fakeHash}`,
-    info_hash: fakeHash,
+    description: fileConfig.description ?? "",
+    accessMode: fileConfig.accessMode ?? "public",
+    updateMode: fileConfig.updateMode ?? "centralized",
   };
 
-  const response = await request(context.scenario.hubUrl, "/announce", {
+  const createResponse = await request(context.scenario.hubUrl, "/networks", {
     method: "POST",
-    body,
+    body: createBody,
+    token,
   });
 
-  if (response.status === 201 && response.body?.file_id) {
+  if (createResponse.status !== 201 || !createResponse.body?.id) {
+    return { request: { method: "POST", path: "/networks", body: createBody, fileKey }, response: createResponse };
+  }
+
+  const networkId = createResponse.body.id;
+  const fakeHash = randomUUID().replaceAll("-", "");
+  const publishBody = {
+    infoHash: fakeHash,
+    filename: fileConfig.title,
+    magnet: `magnet:?xt=urn:btih:${fakeHash}`,
+  };
+
+  const publishResponse = await request(
+    context.scenario.hubUrl,
+    `/networks/${networkId}/versions`,
+    { method: "POST", body: publishBody, token }
+  );
+
+  if (publishResponse.status === 201) {
     context.files[fileKey] = {
       ...fileConfig,
-      ...response.body,
-      info_hash: body.info_hash,
-      magnet_uri: body.magnet_uri,
+      networkId,
+      ownerPeer: peer,
+      fileId: publishResponse.body?.fileId,
+      versionId: publishResponse.body?.versionId,
+      infoHash: fakeHash,
     };
   }
 
   return {
-    request: {
-      method: "POST",
-      path: "/announce",
-      body,
-      fileKey,
-    },
-    response,
+    request: { method: "POST", path: `/networks/${networkId}/versions`, body: publishBody, fileKey },
+    response: publishResponse,
   };
 }
 
-async function executeList(context) {
-  const response = await request(context.scenario.hubUrl, "/files");
-
-  return {
-    request: {
-      method: "GET",
-      path: "/files",
-    },
-    response,
-  };
+async function executeList(peer, context) {
+  const response = await request(context.scenario.hubUrl, "/networks", {
+    token: getToken(peer, context),
+  });
+  return { request: { method: "GET", path: "/networks" }, response };
 }
 
-async function executeDetails(fileKey, context) {
+async function executeDetails(fileKey, peer, context) {
   const file = getKnownFile(fileKey, context);
-
-  const path = `/files/${file.file_id}`;
-  const response = await request(context.scenario.hubUrl, path);
-
-  return {
-    request: {
-      method: "GET",
-      path,
-      fileKey,
-    },
-    response,
-  };
+  const path = `/networks/${file.networkId}/file`;
+  const response = await request(context.scenario.hubUrl, path, {
+    token: getToken(peer, context),
+  });
+  return { request: { method: "GET", path, fileKey }, response };
 }
 
-async function executeHeartbeat({ fileKey, peer, status, context }) {
+async function executeHeartbeat(fileKey, peer, context) {
   const file = getKnownFile(fileKey, context);
-
-  const body = {
-    file_id: file.file_id,
-    peer_uuid: peer,
-    user_id: `user-${peer}`,
-    status,
-  };
+  const body = { networkId: file.networkId, peerId: peer };
 
   const response = await request(context.scenario.hubUrl, "/heartbeat", {
     method: "POST",
     body,
+    token: getToken(peer, context),
   });
 
-  return {
-    request: {
-      method: "POST",
-      path: "/heartbeat",
-      body,
-      fileKey,
-    },
-    response,
-  };
+  return { request: { method: "POST", path: "/heartbeat", body, fileKey }, response };
+}
+
+function getToken(peer, context) {
+  const token = context.tokens[peer];
+  if (!token) {
+    throw new Error(`peer ${peer} não autenticado.`);
+  }
+  return token;
 }
 
 function getKnownFile(fileKey, context) {
   const file = context.files[fileKey];
-
   if (!file) {
     throw new Error(
-      `A ação precisa de ${fileKey}, mas esse arquivo ainda não foi anunciado.`
+      `A ação precisa de ${fileKey}, mas essa rede ainda não foi criada.`
     );
   }
-
   return file;
 }
 
 async function request(hubUrl, path, options = {}) {
   const method = options.method ?? "GET";
 
-  const fetchOptions = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`;
+  }
 
+  const fetchOptions = { method, headers };
   if (options.body !== undefined) {
     fetchOptions.body = JSON.stringify(options.body);
   }
@@ -441,19 +382,13 @@ async function request(hubUrl, path, options = {}) {
   const rawText = await httpResponse.text();
 
   let body = null;
-
   try {
     body = rawText ? JSON.parse(rawText) : null;
   } catch {
     body = rawText;
   }
 
-  return {
-    status: httpResponse.status,
-    ok: httpResponse.ok,
-    body,
-    rawText,
-  };
+  return { status: httpResponse.status, ok: httpResponse.ok, body, rawText };
 }
 
 function validateActionResult(scheduledAction, result, context) {
@@ -475,7 +410,7 @@ function validateActionResult(scheduledAction, result, context) {
     return validateDetails(result);
   }
 
-  if (code.startsWith("HB") || code.startsWith("OFF")) {
+  if (code.startsWith("HB")) {
     return validateHeartbeat(result, context);
   }
 
@@ -484,33 +419,23 @@ function validateActionResult(scheduledAction, result, context) {
 
 function validateHealth(result) {
   const errors = [];
-
   expectStatus(result, 200, errors);
-
   if (result.response.body?.status !== "ok") {
-    errors.push(
-      `body.status deveria ser "ok", recebido: ${formatValue(
-        result.response.body?.status
-      )}`
-    );
+    errors.push(`body.status deveria ser "ok", recebido: ${formatValue(result.response.body?.status)}`);
   }
-
   return errors;
 }
 
 function validateAnnounce(result) {
   const errors = [];
-
   expectStatus(result, 201, errors);
-  expectField(result.response.body, "file_id", errors);
-  expectField(result.response.body, "version_id", errors);
-
+  expectField(result.response.body, "fileId", errors);
+  expectField(result.response.body, "versionId", errors);
   return errors;
 }
 
 function validateList(result, context) {
   const errors = [];
-
   expectStatus(result, 200, errors);
 
   if (!Array.isArray(result.response.body)) {
@@ -519,18 +444,10 @@ function validateList(result, context) {
   }
 
   const knownFiles = Object.values(context.files);
-
-  if (knownFiles.length > 0 && result.response.body.length < knownFiles.length) {
-    errors.push(
-      `GET /files deveria retornar pelo menos ${knownFiles.length} arquivos conhecidos, recebeu ${result.response.body.length}.`
-    );
-  }
-
   for (const file of knownFiles) {
-    const found = result.response.body.some((item) => item.file_id === file.file_id);
-
+    const found = result.response.body.some((item) => item.id === file.networkId);
     if (!found) {
-      errors.push(`GET /files não retornou o arquivo conhecido ${file.file_id}.`);
+      errors.push(`GET /networks não retornou a rede conhecida ${file.networkId}.`);
     }
   }
 
@@ -539,102 +456,46 @@ function validateList(result, context) {
 
 function validateDetails(result) {
   const errors = [];
-  const { fileKey } = result.request;
-
   expectStatus(result, 200, errors);
 
   const body = result.response.body;
-
-  expectField(body, "file_id", errors);
-  expectField(body, "current_version_id", errors);
-  expectField(body, "current_version", errors);
-
-  if (body?.file_id !== undefined && body.file_id !== getExpectedFileId(result)) {
-    errors.push(
-      `details retornou file_id diferente. Esperado ${getExpectedFileId(
-        result
-      )}, recebido ${body.file_id}.`
-    );
-  }
-
-  if (!body?.current_version) {
-    errors.push("body.current_version deveria existir.");
-    return errors;
-  }
-
-  expectField(body.current_version, "version_id", errors);
-  expectField(body.current_version, "magnet_uri", errors);
-  expectField(body.current_version, "file_info_hash", errors);
-
-  if (!fileKey) {
-    errors.push("request.fileKey ausente na validação de details.");
-  }
+  expectField(body, "fileId", errors);
+  expectField(body, "versionId", errors);
+  expectField(body, "infoHash", errors);
 
   return errors;
 }
 
-function getExpectedFileId(result) {
-  return result.request.path.split("/").at(-1);
-}
-
 function validateHeartbeat(result, context) {
   const errors = [];
-
   expectStatus(result, 200, errors);
 
   const body = result.response.body;
   const requestBody = result.request.body;
 
-  if (body?.status !== "ok") {
-    errors.push(
-      `body.status deveria ser "ok", recebido: ${formatValue(body?.status)}`
-    );
+  if (body?.networkId !== requestBody.networkId) {
+    errors.push(`body.networkId deveria ser ${requestBody.networkId}, recebido: ${formatValue(body?.networkId)}`);
   }
 
-  if (body?.file_id !== requestBody.file_id) {
-    errors.push(
-      `body.file_id deveria ser ${requestBody.file_id}, recebido: ${formatValue(
-        body?.file_id
-      )}`
-    );
+  if (body?.peerId !== requestBody.peerId) {
+    errors.push(`body.peerId deveria ser ${requestBody.peerId}, recebido: ${formatValue(body?.peerId)}`);
   }
 
-  if (body?.peer_uuid !== requestBody.peer_uuid) {
-    errors.push(
-      `body.peer_uuid deveria ser ${requestBody.peer_uuid}, recebido: ${formatValue(
-        body?.peer_uuid
-      )}`
-    );
+  if (typeof body?.activePeers !== "number") {
+    errors.push(`body.activePeers deveria ser number, recebido: ${formatValue(body?.activePeers)}`);
+  } else if (body.activePeers < 0) {
+    errors.push(`body.activePeers não pode ser negativo: ${body.activePeers}`);
   }
 
-  if (typeof body?.active_peers !== "number") {
-    errors.push(
-      `body.active_peers deveria ser number, recebido: ${formatValue(
-        body?.active_peers
-      )}`
-    );
-  } else if (body.active_peers < 0) {
-    errors.push(`body.active_peers não pode ser negativo: ${body.active_peers}`);
+  if (typeof body?.shouldActivateFallback !== "boolean") {
+    errors.push(`body.shouldActivateFallback deveria ser boolean, recebido: ${formatValue(body?.shouldActivateFallback)}`);
   }
 
-  if (typeof body?.should_activate_fallback !== "boolean") {
-    errors.push(
-      `body.should_activate_fallback deveria ser boolean, recebido: ${formatValue(
-        body?.should_activate_fallback
-      )}`
-    );
-  }
-
-  if (
-    typeof body?.active_peers === "number" &&
-    typeof body?.should_activate_fallback === "boolean"
-  ) {
-    const expectedFallback =
-      body.active_peers <= context.scenario.fallbackThreshold;
-
-    if (body.should_activate_fallback !== expectedFallback) {
+  if (typeof body?.activePeers === "number" && typeof body?.shouldActivateFallback === "boolean") {
+    const expectedFallback = body.activePeers <= context.scenario.fallbackThreshold;
+    if (body.shouldActivateFallback !== expectedFallback) {
       errors.push(
-        `regra de fallback violada: active_peers=${body.active_peers}, esperado should_activate_fallback=${expectedFallback}, recebido ${body.should_activate_fallback}.`
+        `regra de fallback violada: activePeers=${body.activePeers}, esperado shouldActivateFallback=${expectedFallback}, recebido ${body.shouldActivateFallback}.`
       );
     }
   }
@@ -644,9 +505,7 @@ function validateHeartbeat(result, context) {
 
 function expectStatus(result, expectedStatus, errors) {
   if (result.response.status !== expectedStatus) {
-    errors.push(
-      `status HTTP deveria ser ${expectedStatus}, recebido ${result.response.status}.`
-    );
+    errors.push(`status HTTP deveria ser ${expectedStatus}, recebido ${result.response.status}.`);
   }
 }
 
@@ -655,7 +514,6 @@ function expectField(object, field, errors) {
     errors.push(`body ausente; não foi possível validar campo ${field}.`);
     return;
   }
-
   if (!(field in object)) {
     errors.push(`campo obrigatório ausente: ${field}.`);
   }
@@ -673,16 +531,14 @@ function printScenarioHeader(scenario) {
 
 function printSuccess(label, body) {
   const suffix = summarizeBody(body);
-  console.log(`✅ ${label} passou${suffix}`);
+  console.log(`OK ${label} passou${suffix}`);
 }
 
 function printFailure(label, errors, body) {
-  console.log(`❌ ${label} falhou`);
-
+  console.log(`FAIL ${label} falhou`);
   for (const error of errors) {
     console.log(`   - ${error}`);
   }
-
   console.log("   Resposta recebida:");
   console.log(indent(JSON.stringify(body, null, 2), 3));
 }
@@ -700,34 +556,30 @@ function printReport(context) {
   console.log(`Passaram: ${passed}`);
   console.log(`Falharam: ${failed}`);
 
-  console.log("\nArquivos criados:");
+  console.log("\nRedes criadas:");
   for (const [key, file] of Object.entries(context.files)) {
-    console.log(`- ${key}: ${file.file_id} (${file.title})`);
+    console.log(`- ${key}: ${file.networkId} (${file.title})`);
   }
 
   if (failed > 0) {
     console.log("\nFalhas:");
-
     for (const failure of context.failures) {
       console.log(`\n- tick ${failure.tick}, peer ${failure.peer}, ação ${failure.code}`);
-
       if (failure.error) {
         console.log(`  erro: ${failure.error.message}`);
         continue;
       }
-
       for (const validationError of failure.validationErrors) {
         console.log(`  - ${validationError}`);
       }
-
       console.log("  resposta:");
       console.log(indent(JSON.stringify(failure.response?.body, null, 2), 2));
     }
 
-    console.log("\nStatus: ❌ simulação falhou");
+    console.log("\nStatus: simulação falhou");
     process.exitCode = 1;
   } else {
-    console.log("\nStatus: ✅ simulação concluída com sucesso");
+    console.log("\nStatus: simulação concluída com sucesso");
   }
 
   console.log("==============================================");
@@ -738,15 +590,12 @@ function summarizeBody(body) {
     return "";
   }
 
-  if ("active_peers" in body && "should_activate_fallback" in body) {
-    const expired =
-      "expired_peers" in body ? `, expired=${body.expired_peers}` : "";
-
-    return `: active_peers=${body.active_peers}, fallback=${body.should_activate_fallback}${expired}`;
+  if ("activePeers" in body && "shouldActivateFallback" in body) {
+    return `: activePeers=${body.activePeers}, fallback=${body.shouldActivateFallback}`;
   }
 
-  if ("file_id" in body && "version_id" in body) {
-    return `: file_id=${body.file_id}, version_id=${body.version_id}`;
+  if ("fileId" in body && "versionId" in body) {
+    return `: fileId=${body.fileId}, versionId=${body.versionId}`;
   }
 
   if (Array.isArray(body)) {
