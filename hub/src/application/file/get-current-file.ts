@@ -1,7 +1,8 @@
-import { ForbiddenError, NotFoundError } from "../../domain/errors/domain-error";
+import { NotFoundError } from "../../domain/errors/domain-error";
 import { FileVersionRepository } from "../../domain/file/file-version-repository";
 import { MembershipRepository } from "../../domain/network/membership-repository";
 import { NetworkRepository } from "../../domain/network/network-repository";
+import { assertCanRead } from "../network/access-guards";
 
 export interface GetCurrentFileInput {
   networkId: string;
@@ -32,12 +33,7 @@ export class GetCurrentFile {
       throw new NotFoundError("network not found");
     }
 
-    await this.assertCanRead(
-      network.accessMode,
-      network.ownerId,
-      input.networkId,
-      input.requesterId,
-    );
+    await assertCanRead(network, input.requesterId, this.memberships);
 
     const version = input.versionId
       ? await this.versions.findByVersionId(input.networkId, input.versionId)
@@ -56,20 +52,5 @@ export class GetCurrentFile {
       filename: version.filename,
       lamportTs: version.lamportTs,
     };
-  }
-
-  private async assertCanRead(
-    accessMode: string,
-    ownerId: string,
-    networkId: string,
-    requesterId: string,
-  ): Promise<void> {
-    if (accessMode === "public" || requesterId === ownerId) {
-      return;
-    }
-    const membership = await this.memberships.find(networkId, requesterId);
-    if (!membership || membership.status !== "approved") {
-      throw new ForbiddenError("access not granted");
-    }
   }
 }

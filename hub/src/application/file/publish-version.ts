@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { ForbiddenError, NotFoundError } from "../../domain/errors/domain-error";
+import { NotFoundError } from "../../domain/errors/domain-error";
 import { createFileVersion } from "../../domain/file/file-version";
 import { FileVersionRepository } from "../../domain/file/file-version-repository";
 import { MembershipRepository } from "../../domain/network/membership-repository";
 import { NetworkRepository } from "../../domain/network/network-repository";
 import { LamportClock } from "../ports/lamport-clock";
+import { assertCanContribute } from "../network/access-guards";
 
 export interface PublishVersionInput {
   networkId: string;
@@ -38,7 +39,7 @@ export class PublishVersion {
       throw new NotFoundError("network not found");
     }
 
-    await this.assertCanPublish(network.updateMode, network.ownerId, input);
+    await assertCanContribute(network, input.authorId, this.memberships);
 
     let fileId = network.activeFileId;
     const firstPublish = fileId === null;
@@ -85,22 +86,5 @@ export class PublishVersion {
       parentVersionId,
       concurrent,
     };
-  }
-
-  private async assertCanPublish(
-    updateMode: string,
-    ownerId: string,
-    input: PublishVersionInput,
-  ): Promise<void> {
-    if (input.authorId === ownerId) {
-      return;
-    }
-    if (updateMode === "centralized") {
-      throw new ForbiddenError("only the owner can publish in centralized mode");
-    }
-    const membership = await this.memberships.find(input.networkId, input.authorId);
-    if (!membership || membership.status !== "approved") {
-      throw new ForbiddenError("only approved members can publish");
-    }
   }
 }
