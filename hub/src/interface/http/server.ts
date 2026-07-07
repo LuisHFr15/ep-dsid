@@ -3,10 +3,12 @@ import { AuthController } from "./controllers/auth-controller";
 import { errorHandler } from "./middleware/error-handler";
 import { buildRoutes } from "./routes";
 import { FilesController } from "./controllers/files-controller";
+import { HeartbeatController } from "./controllers/heartbeat-controller";
 
 type Controllers = {
   authController: AuthController;
   filesController: FilesController;
+  heartbeatController: HeartbeatController;
 };
 
 export function buildServer(controllers: Controllers): Express {
