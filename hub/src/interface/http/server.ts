@@ -1,9 +1,8 @@
 import express, { Express } from "express";
-import { AuthController } from "./controllers/auth-controller";
 import { errorHandler } from "./middleware/error-handler";
-import { buildRoutes } from "./routes";
+import { buildRoutes, HttpDeps } from "./routes";
 
-export function buildServer(auth: AuthController): Express {
+export function buildServer(deps: HttpDeps): Express {
   const app = express();
   app.use(express.json());
 
@@ -11,7 +10,7 @@ export function buildServer(auth: AuthController): Express {
     res.json({ status: "ok" });
   });
 
-  app.use(buildRoutes(auth));
+  app.use(buildRoutes(deps));
   app.use(errorHandler);
 
   return app;
