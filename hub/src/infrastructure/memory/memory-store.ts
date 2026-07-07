@@ -33,4 +33,5 @@ export class MemoryStore {
   files = new Map<string, FileRecord>();
   versions = new Map<string, VersionRecord>();
   peers = new Map<string, PeerPresence>();
+  
 }
