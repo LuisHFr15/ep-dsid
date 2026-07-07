@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { GetCurrentFile } from "../../../application/file/get-current-file";
 import { ListVersions } from "../../../application/file/list-versions";
+import { PromoteVersion } from "../../../application/file/promote-version";
 import { PublishVersion } from "../../../application/file/publish-version";
 
 export class FileController {
@@ -8,6 +9,7 @@ export class FileController {
     private readonly publishVersionUseCase: PublishVersion,
     private readonly getCurrentFileUseCase: GetCurrentFile,
     private readonly listVersionsUseCase: ListVersions,
+    private readonly promoteVersionUseCase: PromoteVersion,
   ) {}
 
   publish = async (req: Request, res: Response, next: NextFunction) => {
@@ -49,6 +51,19 @@ export class FileController {
         requesterId: res.locals.user.id,
       });
       res.json(dag);
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  promote = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await this.promoteVersionUseCase.execute({
+        networkId: String(req.params.networkId),
+        versionId: String(req.params.versionId),
+        actorId: res.locals.user.id,
+      });
+      res.status(201).json(result);
     } catch (err) {
       next(err);
     }
