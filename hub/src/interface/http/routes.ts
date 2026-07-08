@@ -1,7 +1,7 @@
 import { RequestHandler, Router } from "express";
 import { AuthController } from "./controllers/auth-controller";
 import { FileController } from "./controllers/file-controller";
-import { HeartbeatController } from "./controllers/heartbeat-controller";
+import { PresenceController } from "./controllers/presence-controller";
 import { NetworkController } from "./controllers/network-controller";
 import { validateBody } from "./middleware/validate";
 import { credentialsSchema } from "./schemas/auth-schemas";
@@ -16,13 +16,13 @@ export interface HttpDeps {
   authController: AuthController;
   networkController: NetworkController;
   fileController: FileController;
-  heartbeatController: HeartbeatController;
+  presenceController: PresenceController;
   authenticate: RequestHandler;
 }
 
 export function buildRoutes(deps: HttpDeps): Router {
   const router = Router();
-  const { authController, networkController, fileController, heartbeatController, authenticate } =
+  const { authController, networkController, fileController, presenceController, authenticate } =
     deps;
 
   router.post("/register", validateBody(credentialsSchema), authController.register);
@@ -65,7 +65,9 @@ export function buildRoutes(deps: HttpDeps): Router {
     fileController.promote,
   );
 
-  router.post("/heartbeat", authenticate, validateBody(heartbeatSchema), heartbeatController.register);
+  router.get("/networks/:networkId/peers", authenticate, presenceController.listPeers);
+
+  router.post("/heartbeat", authenticate, validateBody(heartbeatSchema), presenceController.register);
 
   return router;
 }

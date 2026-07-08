@@ -10,6 +10,7 @@ import { ListVersions } from "../application/file/list-versions";
 import { PromoteVersion } from "../application/file/promote-version";
 import { PublishVersion } from "../application/file/publish-version";
 import { EvaluateFallback } from "../application/presence/evaluate-fallback";
+import { ListActivePeers } from "../application/presence/list-active-peers";
 import { RegisterHeartbeat } from "../application/presence/register-heartbeat";
 import { CommandQueue } from "../application/ports/command-queue";
 import { Config } from "../infrastructure/config/env";
@@ -27,7 +28,7 @@ import { DynamoNetworkRepository } from "../infrastructure/dynamo/dynamo-network
 import { DynamoUserRepository } from "../infrastructure/dynamo/dynamo-user-repository";
 import { AuthController } from "../interface/http/controllers/auth-controller";
 import { FileController } from "../interface/http/controllers/file-controller";
-import { HeartbeatController } from "../interface/http/controllers/heartbeat-controller";
+import { PresenceController } from "../interface/http/controllers/presence-controller";
 import { NetworkController } from "../interface/http/controllers/network-controller";
 import { authenticate } from "../interface/http/middleware/authenticate";
 import { HttpDeps } from "../interface/http/routes";
@@ -89,6 +90,11 @@ export function buildContainer(config: Config): AppContainer {
     membershipRepository,
     presenceStore,
   );
+  const listActivePeers = new ListActivePeers(
+    networkRepository,
+    membershipRepository,
+    presenceStore,
+  );
   const evaluateFallback = new EvaluateFallback(
     networkRepository,
     versionRepository,
@@ -110,14 +116,14 @@ export function buildContainer(config: Config): AppContainer {
     listVersions,
     promoteVersion,
   );
-  const heartbeatController = new HeartbeatController(registerHeartbeat);
+  const presenceController = new PresenceController(registerHeartbeat, listActivePeers);
 
   return {
     http: {
       authController,
       networkController,
       fileController,
-      heartbeatController,
+      presenceController,
       authenticate: authenticate(tokenService),
     },
     evaluateFallback,
