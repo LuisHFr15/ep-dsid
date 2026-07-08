@@ -1,12 +1,10 @@
 import { NotFoundError } from "../../domain/errors/domain-error";
 import { createPresence } from "../../domain/peer/peer-presence";
 import { PeerPresenceStore } from "../../domain/peer/peer-presence-store";
+import { FALLBACK_THRESHOLD, partitionPresence } from "../../domain/peer/presence-policy";
 import { MembershipRepository } from "../../domain/network/membership-repository";
 import { NetworkRepository } from "../../domain/network/network-repository";
 import { assertCanRead } from "../network/access-guards";
-
-const PEER_TIMEOUT_MS = 30_000;
-const FALLBACK_THRESHOLD = 4;
 
 export interface RegisterHeartbeatInput {
   networkId: string;
@@ -42,24 +40,16 @@ export class RegisterHeartbeat {
     await this.presence.save(createPresence(input.networkId, input.peerId, input.userId, nowIso));
 
     const peers = await this.presence.listByNetwork(input.networkId);
-    let activePeers = 0;
-    for (const peer of peers) {
-      if (peer.status !== "online") {
-        continue;
-      }
-      const age = nowMs - new Date(peer.lastSeenAt).getTime();
-      if (age > PEER_TIMEOUT_MS) {
-        await this.presence.save({ ...peer, status: "offline" });
-      } else {
-        activePeers++;
-      }
+    const { active, expired } = partitionPresence(peers, nowMs);
+    for (const peer of expired) {
+      await this.presence.save({ ...peer, status: "offline" });
     }
 
     return {
       networkId: input.networkId,
       peerId: input.peerId,
-      activePeers,
-      shouldActivateFallback: activePeers <= FALLBACK_THRESHOLD,
+      activePeers: active.length,
+      shouldActivateFallback: active.length <= FALLBACK_THRESHOLD,
     };
   }
 }
