@@ -36,7 +36,7 @@ export class PromoteVersion {
     await assertCanContribute(network, input.actorId, this.memberships);
 
     const promoted = await this.versions.findByVersionId(input.networkId, input.versionId);
-    if (!promoted) {
+    if (!promoted || promoted.fileId !== network.activeFileId) {
       throw new NotFoundError("version not found");
     }
 

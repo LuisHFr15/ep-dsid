@@ -42,7 +42,8 @@ export class ListVersions {
 
     await assertCanRead(network, input.requesterId, this.memberships);
 
-    const versions = await this.versions.listVersions(input.networkId);
+    const all = await this.versions.listVersions(input.networkId);
+    const versions = all.filter((v) => v.fileId === network.activeFileId);
     if (versions.length === 0) {
       return { fileId: network.activeFileId, currentVersionId: null, versions: [] };
     }

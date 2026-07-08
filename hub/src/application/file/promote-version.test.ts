@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PromoteVersion } from "./promote-version";
 import { PublishVersion } from "./publish-version";
 import { ForbiddenError, NotFoundError } from "../../domain/errors/domain-error";
+import { createFileVersion } from "../../domain/file/file-version";
 import { createMembership } from "../../domain/network/membership";
 import { createNetwork, UpdateMode } from "../../domain/network/network";
 import {
@@ -108,6 +109,25 @@ describe("PromoteVersion", () => {
     const s = await setup();
     await expect(
       s.promote.execute({ networkId: "nope", versionId: "x", actorId: "alice" }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("rejects promoting a version that does not belong to the active file", async () => {
+    const s = await setup();
+    await fork(s);
+    const stale = createFileVersion({
+      networkId: s.network.id,
+      fileId: "deprecated-file",
+      parentVersionId: null,
+      infoHash: "old",
+      filename: "old.txt",
+      lamportTs: 1,
+      authorId: "alice",
+    });
+    await s.versions.save(stale);
+
+    await expect(
+      s.promote.execute({ networkId: s.network.id, versionId: stale.versionId, actorId: "alice" }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
