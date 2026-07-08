@@ -9,12 +9,17 @@ import { GetCurrentFile } from "../application/file/get-current-file";
 import { ListVersions } from "../application/file/list-versions";
 import { PromoteVersion } from "../application/file/promote-version";
 import { PublishVersion } from "../application/file/publish-version";
+import { EvaluateFallback } from "../application/presence/evaluate-fallback";
 import { RegisterHeartbeat } from "../application/presence/register-heartbeat";
+import { CommandQueue } from "../application/ports/command-queue";
 import { Config } from "../infrastructure/config/env";
 import { BcryptPasswordHasher } from "../infrastructure/crypto/bcrypt-password-hasher";
 import { JwtTokenService } from "../infrastructure/crypto/jwt-token-service";
 import { createDocumentClient } from "../infrastructure/dynamo/dynamo-client";
 import { InMemoryPeerPresenceStore } from "../infrastructure/memory/in-memory-peer-presence-store";
+import { LoggingCommandQueue } from "../infrastructure/sqs/logging-command-queue";
+import { SqsCommandQueue } from "../infrastructure/sqs/sqs-command-queue";
+import { createSqsClient } from "../infrastructure/sqs/sqs-client";
 import { DynamoFileVersionRepository } from "../infrastructure/dynamo/dynamo-file-version-repository";
 import { DynamoLamportClock } from "../infrastructure/dynamo/dynamo-lamport-clock";
 import { DynamoMembershipRepository } from "../infrastructure/dynamo/dynamo-membership-repository";
@@ -27,9 +32,18 @@ import { NetworkController } from "../interface/http/controllers/network-control
 import { authenticate } from "../interface/http/middleware/authenticate";
 import { HttpDeps } from "../interface/http/routes";
 
-export function buildContainer(config: Config): HttpDeps {
+export interface AppContainer {
+  http: HttpDeps;
+  evaluateFallback: EvaluateFallback;
+}
+
+export function buildContainer(config: Config): AppContainer {
   const documentClient = createDocumentClient(config);
   const table = config.aws.dynamoTable;
+
+  const commandQueue: CommandQueue = config.aws.sqsQueueUrl
+    ? new SqsCommandQueue(createSqsClient(config), config.aws.sqsQueueUrl)
+    : new LoggingCommandQueue();
 
   const userRepository = new DynamoUserRepository(documentClient, table);
   const networkRepository = new DynamoNetworkRepository(documentClient, table);
@@ -75,6 +89,12 @@ export function buildContainer(config: Config): HttpDeps {
     membershipRepository,
     presenceStore,
   );
+  const evaluateFallback = new EvaluateFallback(
+    networkRepository,
+    versionRepository,
+    presenceStore,
+    commandQueue,
+  );
 
   const authController = new AuthController(registerUser, authenticateUser);
   const networkController = new NetworkController(
@@ -93,10 +113,13 @@ export function buildContainer(config: Config): HttpDeps {
   const heartbeatController = new HeartbeatController(registerHeartbeat);
 
   return {
-    authController,
-    networkController,
-    fileController,
-    heartbeatController,
-    authenticate: authenticate(tokenService),
+    http: {
+      authController,
+      networkController,
+      fileController,
+      heartbeatController,
+      authenticate: authenticate(tokenService),
+    },
+    evaluateFallback,
   };
 }
