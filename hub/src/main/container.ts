@@ -5,6 +5,7 @@ import { DecideAccess } from "../application/network/decide-access";
 import { ListNetworks } from "../application/network/list-networks";
 import { ListPendingRequests } from "../application/network/list-pending-requests";
 import { RequestAccess } from "../application/network/request-access";
+import { AnnounceFile } from "../application/file/announce-file";
 import { GetCurrentFile } from "../application/file/get-current-file";
 import { ListVersions } from "../application/file/list-versions";
 import { PromoteVersion } from "../application/file/promote-version";
@@ -85,6 +86,7 @@ export function buildContainer(config: Config): AppContainer {
     versionRepository,
     lamportClock,
   );
+  const announceFile = new AnnounceFile(networkRepository, versionRepository, lamportClock);
   const registerHeartbeat = new RegisterHeartbeat(
     networkRepository,
     membershipRepository,
@@ -115,6 +117,7 @@ export function buildContainer(config: Config): AppContainer {
     getCurrentFile,
     listVersions,
     promoteVersion,
+    announceFile,
   );
   const presenceController = new PresenceController(registerHeartbeat, listActivePeers);
 

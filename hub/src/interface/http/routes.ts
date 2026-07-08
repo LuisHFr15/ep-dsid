@@ -7,6 +7,7 @@ import { validateBody } from "./middleware/validate";
 import { credentialsSchema } from "./schemas/auth-schemas";
 import { heartbeatSchema } from "./schemas/heartbeat-schemas";
 import {
+  announceFileSchema,
   createNetworkSchema,
   decideAccessSchema,
   publishVersionSchema,
@@ -50,6 +51,12 @@ export function buildRoutes(deps: HttpDeps): Router {
     authenticate,
     validateBody(decideAccessSchema),
     networkController.decide,
+  );
+  router.post(
+    "/networks/:networkId/files",
+    authenticate,
+    validateBody(announceFileSchema),
+    fileController.announce,
   );
   router.post(
     "/networks/:networkId/versions",

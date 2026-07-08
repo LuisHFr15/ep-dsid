@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { AnnounceFile } from "../../../application/file/announce-file";
 import { GetCurrentFile } from "../../../application/file/get-current-file";
 import { ListVersions } from "../../../application/file/list-versions";
 import { PromoteVersion } from "../../../application/file/promote-version";
@@ -10,7 +11,25 @@ export class FileController {
     private readonly getCurrentFileUseCase: GetCurrentFile,
     private readonly listVersionsUseCase: ListVersions,
     private readonly promoteVersionUseCase: PromoteVersion,
+    private readonly announceFileUseCase: AnnounceFile,
   ) {}
+
+  announce = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { infoHash, filename, magnet, size } = res.locals.body;
+      const result = await this.announceFileUseCase.execute({
+        networkId: String(req.params.networkId),
+        ownerId: res.locals.user.id,
+        infoHash,
+        filename,
+        magnet,
+        size,
+      });
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  };
 
   publish = async (req: Request, res: Response, next: NextFunction) => {
     try {

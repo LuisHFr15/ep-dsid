@@ -19,3 +19,10 @@ export const publishVersionSchema = z.object({
   size: z.number().int().nonnegative().optional(),
   parentVersionId: z.string().optional(),
 });
+
+export const announceFileSchema = z.object({
+  infoHash: z.string().min(1),
+  filename: z.string().min(1),
+  magnet: z.string().optional(),
+  size: z.number().int().nonnegative().optional(),
+});
