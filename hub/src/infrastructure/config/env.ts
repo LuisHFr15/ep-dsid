@@ -10,6 +10,7 @@ const schema = z.object({
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(10),
   SQS_QUEUE_URL: z.string().url().optional().or(z.literal("")),
   FALLBACK_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(15000),
+  PRESENCE_FLUSH_INTERVAL_MS: z.coerce.number().int().positive().default(10000),
 });
 
 export type Config = {
@@ -26,6 +27,7 @@ export type Config = {
   };
   bcryptRounds: number;
   fallbackSweepIntervalMs: number;
+  presenceFlushIntervalMs: number;
 };
 
 export function loadConfig(): Config {
@@ -52,5 +54,6 @@ export function loadConfig(): Config {
     },
     bcryptRounds: env.BCRYPT_ROUNDS,
     fallbackSweepIntervalMs: env.FALLBACK_SWEEP_INTERVAL_MS,
+    presenceFlushIntervalMs: env.PRESENCE_FLUSH_INTERVAL_MS,
   };
 }
