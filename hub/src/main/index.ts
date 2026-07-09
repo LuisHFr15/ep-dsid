@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { loadConfig } from "../infrastructure/config/env";
-import { startFallbackScheduler } from "../infrastructure/scheduler/fallback-scheduler";
+import { startInterval } from "../infrastructure/scheduler/interval-scheduler";
 import { buildServer } from "../interface/http/server";
 import { buildContainer } from "./container";
 
@@ -12,6 +12,8 @@ app.listen(config.port, () => {
   console.log(`hub listening on ${config.port}`);
 });
 
-startFallbackScheduler(container.evaluateFallback, config.fallbackSweepIntervalMs, (err) =>
-  console.error("fallback evaluation failed", err),
+startInterval(
+  () => container.evaluateFallback.evaluateAll(),
+  config.fallbackSweepIntervalMs,
+  (err) => console.error("fallback evaluation failed", err),
 );
