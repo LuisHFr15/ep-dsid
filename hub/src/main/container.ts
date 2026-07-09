@@ -1,43 +1,139 @@
 import { AuthenticateUser } from "../application/auth/authenticate-user";
 import { RegisterUser } from "../application/auth/register-user";
+import { CreateNetwork } from "../application/network/create-network";
+import { DecideAccess } from "../application/network/decide-access";
+import { ListNetworks } from "../application/network/list-networks";
+import { ListPendingRequests } from "../application/network/list-pending-requests";
+import { RequestAccess } from "../application/network/request-access";
+import { AnnounceFile } from "../application/file/announce-file";
+import { GetCurrentFile } from "../application/file/get-current-file";
+import { ListVersions } from "../application/file/list-versions";
+import { PromoteVersion } from "../application/file/promote-version";
+import { PublishVersion } from "../application/file/publish-version";
+import { EvaluateFallback } from "../application/presence/evaluate-fallback";
+import { ListActivePeers } from "../application/presence/list-active-peers";
+import { RegisterHeartbeat } from "../application/presence/register-heartbeat";
+import { CommandQueue } from "../application/ports/command-queue";
 import { Config } from "../infrastructure/config/env";
 import { BcryptPasswordHasher } from "../infrastructure/crypto/bcrypt-password-hasher";
 import { JwtTokenService } from "../infrastructure/crypto/jwt-token-service";
 import { createDocumentClient } from "../infrastructure/dynamo/dynamo-client";
+import { DynamoPeerPresenceStore } from "../infrastructure/dynamo/dynamo-peer-presence-store";
+import { CachingPeerPresenceStore } from "../infrastructure/memory/caching-peer-presence-store";
+import { LoggingCommandQueue } from "../infrastructure/sqs/logging-command-queue";
+import { SqsCommandQueue } from "../infrastructure/sqs/sqs-command-queue";
+import { createSqsClient } from "../infrastructure/sqs/sqs-client";
+import { DynamoFileVersionRepository } from "../infrastructure/dynamo/dynamo-file-version-repository";
+import { DynamoLamportClock } from "../infrastructure/dynamo/dynamo-lamport-clock";
+import { DynamoMembershipRepository } from "../infrastructure/dynamo/dynamo-membership-repository";
+import { DynamoNetworkRepository } from "../infrastructure/dynamo/dynamo-network-repository";
 import { DynamoUserRepository } from "../infrastructure/dynamo/dynamo-user-repository";
 import { AuthController } from "../interface/http/controllers/auth-controller";
-import { AnnounceFile } from "../application/files/announce-file";
-import { ListFiles } from "../application/files/list-files";
-import { MemoryStore } from "../infrastructure/memory/memory-store";
-import { FilesController } from "../interface/http/controllers/files-controller";
-import { RegisterHeartbeat } from "../application/heartbeat/register-heartbeat";
-import { HeartbeatController } from "../interface/http/controllers/heartbeat-controller";
-import { GetFileDetails } from "../application/files/get-file-details";
+import { FileController } from "../interface/http/controllers/file-controller";
+import { PresenceController } from "../interface/http/controllers/presence-controller";
+import { NetworkController } from "../interface/http/controllers/network-controller";
+import { authenticate } from "../interface/http/middleware/authenticate";
+import { HttpDeps } from "../interface/http/routes";
 
-export function buildContainer(config: Config) {
+export interface AppContainer {
+  http: HttpDeps;
+  evaluateFallback: EvaluateFallback;
+  presence: CachingPeerPresenceStore;
+}
+
+export function buildContainer(config: Config): AppContainer {
   const documentClient = createDocumentClient(config);
-  const userRepository = new DynamoUserRepository(documentClient, config.aws.dynamoTable);
+  const table = config.aws.dynamoTable;
+
+  const commandQueue: CommandQueue = config.aws.sqsQueueUrl
+    ? new SqsCommandQueue(createSqsClient(config), config.aws.sqsQueueUrl)
+    : new LoggingCommandQueue();
+
+  const userRepository = new DynamoUserRepository(documentClient, table);
+  const networkRepository = new DynamoNetworkRepository(documentClient, table);
+  const membershipRepository = new DynamoMembershipRepository(documentClient, table);
+  const versionRepository = new DynamoFileVersionRepository(documentClient, table);
+  const lamportClock = new DynamoLamportClock(documentClient, table);
+  const presenceStore = new CachingPeerPresenceStore(
+    new DynamoPeerPresenceStore(documentClient, table),
+  );
+
   const passwordHasher = new BcryptPasswordHasher(config.bcryptRounds);
   const tokenService = new JwtTokenService(config.jwt.secret, config.jwt.expiresIn);
 
   const registerUser = new RegisterUser(userRepository, passwordHasher);
   const authenticateUser = new AuthenticateUser(userRepository, passwordHasher, tokenService);
-
-  const authController = new AuthController(registerUser, authenticateUser);
-  
-  const memoryStore = new MemoryStore();
-  const announceFile = new AnnounceFile(memoryStore);
-  const listFiles = new ListFiles(memoryStore);
-  const getFileDetails = new GetFileDetails(memoryStore);
-
-  const filesController = new FilesController(
-    announceFile,
-    listFiles,
-    getFileDetails
+  const createNetwork = new CreateNetwork(networkRepository, membershipRepository);
+  const requestAccess = new RequestAccess(networkRepository, membershipRepository);
+  const listPendingRequests = new ListPendingRequests(networkRepository, membershipRepository);
+  const decideAccess = new DecideAccess(networkRepository, membershipRepository);
+  const listNetworks = new ListNetworks(networkRepository);
+  const publishVersion = new PublishVersion(
+    networkRepository,
+    membershipRepository,
+    versionRepository,
+    lamportClock,
+  );
+  const getCurrentFile = new GetCurrentFile(
+    networkRepository,
+    membershipRepository,
+    versionRepository,
+  );
+  const listVersions = new ListVersions(
+    networkRepository,
+    membershipRepository,
+    versionRepository,
+  );
+  const promoteVersion = new PromoteVersion(
+    networkRepository,
+    membershipRepository,
+    versionRepository,
+    lamportClock,
+  );
+  const announceFile = new AnnounceFile(networkRepository, versionRepository, lamportClock);
+  const registerHeartbeat = new RegisterHeartbeat(
+    networkRepository,
+    membershipRepository,
+    presenceStore,
+  );
+  const listActivePeers = new ListActivePeers(
+    networkRepository,
+    membershipRepository,
+    presenceStore,
+  );
+  const evaluateFallback = new EvaluateFallback(
+    networkRepository,
+    versionRepository,
+    presenceStore,
+    commandQueue,
   );
 
-  const registerHeartbeat = new RegisterHeartbeat(memoryStore);
-  const heartbeatController = new HeartbeatController(registerHeartbeat);
+  const authController = new AuthController(registerUser, authenticateUser);
+  const networkController = new NetworkController(
+    createNetwork,
+    requestAccess,
+    listPendingRequests,
+    decideAccess,
+    listNetworks,
+  );
+  const fileController = new FileController(
+    publishVersion,
+    getCurrentFile,
+    listVersions,
+    promoteVersion,
+    announceFile,
+  );
+  const presenceController = new PresenceController(registerHeartbeat, listActivePeers);
 
-  return { authController, filesController, heartbeatController };
+  return {
+    http: {
+      authController,
+      networkController,
+      fileController,
+      presenceController,
+      authenticate: authenticate(tokenService),
+    },
+    evaluateFallback,
+    presence: presenceStore,
+  };
 }

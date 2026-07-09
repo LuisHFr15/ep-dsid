@@ -4,21 +4,20 @@ const HUB_URL = process.env.HUB_URL ?? "http://localhost:3000";
 
 const SIMULATION_MODE = "fixed";
 // const SIMULATION_MODE = "random";
-// const SIMULATION_MODE = "fixed";
 
 const RANDOM_SEED = 12345;
 const RANDOM_TICKS = 60;
 
 const baseScenario = {
-  name: "MVP 6A - simulador deterministico com 2 arquivos e heartbeats",
+  name: "simulador deterministico com 2 redes e heartbeats",
   hubUrl: HUB_URL,
 
   // Cada coluna da tabela representa 1 avanço de tempo.
   tickMs: 2_000,
 
-  // Regra atual do projeto:
-  // active_peers <= 4  => fallback true
-  // active_peers > 4   => fallback false
+  // Regra do projeto:
+  // activePeers <= 4  => fallback true
+  // activePeers > 4   => fallback false
   fallbackThreshold: 4,
 
   peers: [
@@ -34,14 +33,16 @@ const baseScenario = {
   files: {
     file1: {
       title: "relatorio-file-1.pdf",
-      description: "Arquivo 1 criado pelo simulador",
-      visibility: "public",
+      description: "Rede 1 criada pelo simulador",
+      accessMode: "public",
+      updateMode: "centralized",
     },
 
     file2: {
       title: "relatorio-file-2.pdf",
-      description: "Arquivo 2 criado pelo simulador",
-      visibility: "public",
+      description: "Rede 2 criada pelo simulador",
+      accessMode: "public",
+      updateMode: "centralized",
     },
   },
 
@@ -50,14 +51,14 @@ const baseScenario = {
 
     -   = nenhuma ação
     H   = GET /health
-    A1  = POST /announce para file1
-    A2  = POST /announce para file2
-    L   = GET /files
-    D1  = GET /files/:file_id para file1
-    D2  = GET /files/:file_id para file2
+    A1  = cria rede + publica versão para file1 (POST /networks + /versions)
+    A2  = cria rede + publica versão para file2
+    L   = GET /networks
+    D1  = GET /networks/:id/file para file1
+    D2  = GET /networks/:id/file para file2
 
     Cada linha corresponde ao peer na mesma posição do array "peers".
-    Cada coluna é um tick de tempo.
+    Cada coluna é um tick de tempo. Todas as ações usam o JWT do peer.
   */
   actionTable: [
     // t0   t1    t2    t3   t4    t5
@@ -74,25 +75,22 @@ const baseScenario = {
     Códigos de heartbeat:
 
     -     = nenhuma ação
-    HB1   = POST /heartbeat online para file1
-    HB2   = POST /heartbeat online para file2
-    OFF1  = POST /heartbeat offline para file1
-    OFF2  = POST /heartbeat offline para file2
+    HB1   = POST /heartbeat para a rede de file1
+    HB2   = POST /heartbeat para a rede de file2
 
-    Esta tabela fica separada porque heartbeat representa presença recorrente.
+    Presença offline não é enviada pelo cliente: o hub expira o peer por
+    timeout (~30s sem batida). Para "sair", o peer simplesmente para de bater.
   */
   heartbeatTable: [
-  // t0   t1   t2   t3    t4    t5    t6    t7     t8    t9    t10   t11   t12   t13   t14   t15   t16   t17   t18   t19   t20
-  ["-",  "-",  "-",  "HB1", "HB1", "HB1", "HB1", "HB1",  "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-1
-  ["-",  "-",  "-",  "HB1", "HB1", "HB1", "HB1", "HB1",  "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-2
-  ["-",  "-",  "-",  "HB1", "HB1", "-",   "-",   "-",    "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "HB1"], // peer-3 expira
-  ["-",  "-",  "-",  "-",   "HB1", "HB1", "HB1", "HB1",  "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-4
-  ["-",  "-",  "-",  "-",   "-",   "HB1", "HB1", "OFF1", "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-"],   // peer-5 offline explícito
-
-  ["-",  "-",  "-",  "HB2", "HB2", "HB2", "HB2", "HB2",  "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2"], // peer-6
-  ["-",  "-",  "-",  "-",   "HB2", "HB2", "HB2", "HB2",  "OFF2", "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-"],   // peer-7 offline explícito
-    ],
-
+  // t0   t1   t2   t3    t4    t5    t6    t7    t8    t9    t10   t11   t12   t13   t14   t15   t16   t17   t18   t19   t20
+  ["-",  "-",  "-",  "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-1
+  ["-",  "-",  "-",  "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-2
+  ["-",  "-",  "-",  "HB1", "HB1", "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "HB1"], // peer-3 expira e volta
+  ["-",  "-",  "-",  "-",   "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1", "HB1"], // peer-4
+  ["-",  "-",  "-",  "-",   "-",   "HB1", "HB1", "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-"],   // peer-5 para de bater
+  ["-",  "-",  "-",  "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2", "HB2"], // peer-6
+  ["-",  "-",  "-",  "-",   "HB2", "HB2", "HB2", "HB2", "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-",   "-"],   // peer-7 para de bater
+  ],
 };
 
 let scenario;
@@ -107,8 +105,8 @@ if (SIMULATION_MODE === "random") {
     /*
       Os 3 primeiros ticks são setup determinístico:
       t0: health
-      t1: announce file1
-      t2: announce file2
+      t1: cria rede file1
+      t2: cria rede file2
 
       Depois disso entra a fase aleatória.
     */
@@ -126,16 +124,14 @@ if (SIMULATION_MODE === "random") {
 
     heartbeatWeights: {
       "-": 35,
-      HB1: 30,
-      HB2: 25,
-      OFF1: 5,
-      OFF2: 5,
+      HB1: 35,
+      HB2: 30,
     },
   });
 
   scenario = {
     ...baseScenario,
-    name: `MVP 6B - simulador aleatorio com seed ${seed}`,
+    name: `simulador aleatorio com seed ${seed}`,
     mode: SIMULATION_MODE,
     seed,
     ...randomTables,
@@ -143,9 +139,7 @@ if (SIMULATION_MODE === "random") {
 } else {
   scenario = {
     ...baseScenario,
-    name: "MVP 6A - simulador deterministico com 2 arquivos e heartbeats",
     mode: SIMULATION_MODE,
-
   };
 }
 

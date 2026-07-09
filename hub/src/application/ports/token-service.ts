@@ -5,4 +5,5 @@ export interface TokenPayload {
 
 export interface TokenService {
   sign(payload: TokenPayload): string;
+  verify(token: string): TokenPayload;
 }
