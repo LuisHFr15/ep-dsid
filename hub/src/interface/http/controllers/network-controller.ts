@@ -14,9 +14,11 @@ export class NetworkController {
     private readonly listNetworksUseCase: ListNetworks,
   ) {}
 
-  list = async (_req: Request, res: Response, next: NextFunction) => {
+  list = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const networks = await this.listNetworksUseCase.execute();
+      const q = typeof req.query.q === "string" ? req.query.q : undefined;
+      const tag = typeof req.query.tag === "string" ? req.query.tag : undefined;
+      const networks = await this.listNetworksUseCase.execute({ q, tag });
       res.json(networks);
     } catch (err) {
       next(err);
