@@ -18,7 +18,7 @@ import { Config } from "../infrastructure/config/env";
 import { BcryptPasswordHasher } from "../infrastructure/crypto/bcrypt-password-hasher";
 import { JwtTokenService } from "../infrastructure/crypto/jwt-token-service";
 import { createDocumentClient } from "../infrastructure/dynamo/dynamo-client";
-import { InMemoryPeerPresenceStore } from "../infrastructure/memory/in-memory-peer-presence-store";
+import { DynamoPeerPresenceStore } from "../infrastructure/dynamo/dynamo-peer-presence-store";
 import { LoggingCommandQueue } from "../infrastructure/sqs/logging-command-queue";
 import { SqsCommandQueue } from "../infrastructure/sqs/sqs-command-queue";
 import { createSqsClient } from "../infrastructure/sqs/sqs-client";
@@ -52,7 +52,7 @@ export function buildContainer(config: Config): AppContainer {
   const membershipRepository = new DynamoMembershipRepository(documentClient, table);
   const versionRepository = new DynamoFileVersionRepository(documentClient, table);
   const lamportClock = new DynamoLamportClock(documentClient, table);
-  const presenceStore = new InMemoryPeerPresenceStore();
+  const presenceStore = new DynamoPeerPresenceStore(documentClient, table);
 
   const passwordHasher = new BcryptPasswordHasher(config.bcryptRounds);
   const tokenService = new JwtTokenService(config.jwt.secret, config.jwt.expiresIn);
