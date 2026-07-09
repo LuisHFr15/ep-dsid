@@ -19,6 +19,7 @@ interface NetworkItem {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   ownerId: string;
   accessMode: Network["accessMode"];
   updateMode: Network["updateMode"];
@@ -40,6 +41,7 @@ function toItem(network: Network): NetworkItem {
     id: network.id,
     title: network.title,
     description: network.description,
+    tags: network.tags,
     ownerId: network.ownerId,
     accessMode: network.accessMode,
     updateMode: network.updateMode,
@@ -53,6 +55,7 @@ function toNetwork(item: NetworkItem): Network {
     id: item.id,
     title: item.title,
     description: item.description,
+    tags: item.tags ?? [],
     ownerId: item.ownerId,
     accessMode: item.accessMode,
     updateMode: item.updateMode,

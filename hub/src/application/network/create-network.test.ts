@@ -41,4 +41,31 @@ describe("CreateNetwork", () => {
     const membership = await memberships.find(network.id, "alice");
     expect(membership?.status).toBe("approved");
   });
+
+  it("stores the provided tags", async () => {
+    const { createNetwork } = setup();
+    const network = await createNetwork.execute({
+      ownerId: "alice",
+      title: "docs",
+      description: "",
+      tags: ["report", "2026"],
+      accessMode: "private",
+      updateMode: "centralized",
+    });
+
+    expect(network.tags).toEqual(["report", "2026"]);
+  });
+
+  it("defaults tags to an empty array", async () => {
+    const { createNetwork } = setup();
+    const network = await createNetwork.execute({
+      ownerId: "alice",
+      title: "docs",
+      description: "",
+      accessMode: "private",
+      updateMode: "centralized",
+    });
+
+    expect(network.tags).toEqual([]);
+  });
 });

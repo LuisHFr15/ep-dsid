@@ -12,6 +12,7 @@ export interface CreateNetworkInput {
   ownerId: string;
   title: string;
   description: string;
+  tags?: string[];
   accessMode: AccessMode;
   updateMode: UpdateMode;
 }
@@ -26,6 +27,7 @@ export class CreateNetwork {
     const network = createNetwork({
       title: input.title,
       description: input.description,
+      tags: input.tags,
       ownerId: input.ownerId,
       accessMode: input.accessMode,
       updateMode: input.updateMode,

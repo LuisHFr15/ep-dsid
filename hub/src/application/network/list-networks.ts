@@ -4,6 +4,7 @@ export interface NetworkSummary {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   ownerId: string;
   accessMode: string;
   updateMode: string;
@@ -19,6 +20,7 @@ export class ListNetworks {
       id: n.id,
       title: n.title,
       description: n.description,
+      tags: n.tags,
       ownerId: n.ownerId,
       accessMode: n.accessMode,
       updateMode: n.updateMode,

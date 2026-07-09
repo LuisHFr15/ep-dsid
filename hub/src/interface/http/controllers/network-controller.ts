@@ -25,11 +25,12 @@ export class NetworkController {
 
   create = async (_req: Request, res: Response, next: NextFunction) => {
     try {
-      const { title, description, accessMode, updateMode } = res.locals.body;
+      const { title, description, tags, accessMode, updateMode } = res.locals.body;
       const network = await this.createNetworkUseCase.execute({
         ownerId: res.locals.user.id,
         title,
         description,
+        tags,
         accessMode,
         updateMode,
       });

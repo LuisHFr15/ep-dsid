@@ -7,6 +7,7 @@ export interface Network {
   id: string;
   title: string;
   description: string;
+  tags: string[];
   ownerId: string;
   accessMode: AccessMode;
   updateMode: UpdateMode;
@@ -17,6 +18,7 @@ export interface Network {
 export interface CreateNetworkInput {
   title: string;
   description: string;
+  tags?: string[];
   ownerId: string;
   accessMode: AccessMode;
   updateMode: UpdateMode;
@@ -27,6 +29,7 @@ export function createNetwork(input: CreateNetworkInput): Network {
     id: randomUUID(),
     title: input.title,
     description: input.description,
+    tags: input.tags ?? [],
     ownerId: input.ownerId,
     accessMode: input.accessMode,
     updateMode: input.updateMode,

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const createNetworkSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(""),
+  tags: z.array(z.string()).default([]),
   accessMode: z.enum(["private", "public"]),
   updateMode: z.enum(["centralized", "collaborative"]),
 });
