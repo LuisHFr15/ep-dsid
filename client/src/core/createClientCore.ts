@@ -1,4 +1,8 @@
-import { AnnounceFileInput, HubHttpClient } from "../hub/HubHttpClient.js"
+import {
+  AnnounceFileInput,
+  HeartbeatInput,
+  HubHttpClient
+} from "../hub/HubHttpClient.js"
 
 export type ClientCoreConfig = {
   hubBaseUrl: string
@@ -16,6 +20,8 @@ export function createClientCore(config: ClientCoreConfig) {
 
     getFile: (fileId: string) => hub.getFile(fileId),
 
-    announceFile: (input: AnnounceFileInput) => hub.announceFile(input)
+    announceFile: (input: AnnounceFileInput) => hub.announceFile(input),
+
+    heartbeat: (input: HeartbeatInput) => hub.heartbeat(input)
   }
 }

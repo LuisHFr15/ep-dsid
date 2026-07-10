@@ -73,6 +73,24 @@ export async function runCliCommand(args: string[]): Promise<void> {
       return
     }
 
+    case "heartbeat:once": {
+    const peerId = args[1]
+    const fileIds = args.slice(2)
+
+    if (!peerId) {
+        throw new Error("Uso: heartbeat:once <peer_id> <file_id...>")
+    }
+
+    const result = await client.heartbeat({
+        peer_id: peerId,
+        file_ids: fileIds
+    })
+
+    console.log("[heartbeat:once] Heartbeat enviado:")
+    console.log(JSON.stringify(result, null, 2))
+    return
+    }
+
     default: {
       throw new Error(`Comando desconhecido: ${command}`)
     }
