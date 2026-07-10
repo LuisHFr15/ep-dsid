@@ -1,106 +1,123 @@
 export type HealthResponse = {
-  ok?: boolean
-  status?: string
-  service?: string
-  [key: string]: unknown
+    ok?: boolean
+    status?: string
+    service?: string
+    [key: string]: unknown
 }
 
 export type HubFileSummary = {
-  file_id?: string
-  id?: string
-  name?: string
-  title?: string
-  description?: string
-  active_peers?: number
-  fallback_active?: boolean
-  [key: string]: unknown
+    file_id?: string
+    id?: string
+    name?: string
+    title?: string
+    description?: string
+    active_peers?: number
+    fallback_active?: boolean
+    [key: string]: unknown
 }
 
 export type HubFileDetails = {
-  file_id?: string
-  id?: string
-  name?: string
-  title?: string
-  description?: string
-  active_peers?: number
-  fallback_active?: boolean
-  versions?: unknown[]
-  peers?: unknown[]
-  [key: string]: unknown
+    file_id?: string
+    id?: string
+    name?: string
+    title?: string
+    description?: string
+    active_peers?: number
+    fallback_active?: boolean
+    versions?: unknown[]
+    peers?: unknown[]
+    [key: string]: unknown
 }
 
 export type AnnounceFileInput = {
-  name: string
-  size: number
-  info_hash: string
-  peer_id: string
+    name: string
+    size: number
+    info_hash: string
+    peer_id: string
 }
 
 export type AnnounceFileResponse = {
-  file_id?: string
-  version_id?: string
-  id?: string
-  status?: string
-  [key: string]: unknown
+    file_id?: string
+    version_id?: string
+    id?: string
+    status?: string
+    [key: string]: unknown
 }
 
 export type HubHttpClientConfig = {
-  hubBaseUrl: string
+    hubBaseUrl: string
 }
 
+export type HeartbeatInput = {
+    peer_id: string
+    file_ids: string[]
+}
+
+export type HeartbeatResponse = {
+    ok?: boolean
+    peer_id?: string
+    tracked_files?: string[]
+    [key: string]: unknown
+}
+
+
 export class HubHttpClient {
-  private readonly hubBaseUrl: string
+    private readonly hubBaseUrl: string
 
-  constructor(config: HubHttpClientConfig) {
-    this.hubBaseUrl = config.hubBaseUrl.replace(/\/$/, "")
-  }
-
-  async health(): Promise<HealthResponse> {
-    return this.getJson<HealthResponse>("/health")
-  }
-
-  async listFiles(): Promise<HubFileSummary[]> {
-    return this.getJson<HubFileSummary[]>("/files")
-  }
-
-  async getFile(fileId: string): Promise<HubFileDetails> {
-    const encodedFileId = encodeURIComponent(fileId)
-    return this.getJson<HubFileDetails>(`/files/${encodedFileId}`)
-  }
-
-  async announceFile(input: AnnounceFileInput): Promise<AnnounceFileResponse> {
-    return this.postJson<AnnounceFileResponse>("/announce", input)
-  }
-
-  private async getJson<T>(path: string): Promise<T> {
-    const response = await fetch(`${this.hubBaseUrl}${path}`)
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "")
-      const detail = body ? ` - ${body}` : ""
-
-      throw new Error(`GET ${path} falhou com status ${response.status}${detail}`)
+    constructor(config: HubHttpClientConfig) {
+        this.hubBaseUrl = config.hubBaseUrl.replace(/\/$/, "")
     }
 
-    return response.json() as Promise<T>
-  }
-
-  private async postJson<T>(path: string, body: unknown): Promise<T> {
-    const response = await fetch(`${this.hubBaseUrl}${path}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(body)
-    })
-
-    if (!response.ok) {
-      const responseBody = await response.text().catch(() => "")
-      const detail = responseBody ? ` - ${responseBody}` : ""
-
-      throw new Error(`POST ${path} falhou com status ${response.status}${detail}`)
+    async health(): Promise<HealthResponse> {
+        return this.getJson<HealthResponse>("/health")
     }
 
-    return response.json() as Promise<T>
-  }
+    async listFiles(): Promise<HubFileSummary[]> {
+        return this.getJson<HubFileSummary[]>("/files")
+    }
+
+    async getFile(fileId: string): Promise<HubFileDetails> {
+        const encodedFileId = encodeURIComponent(fileId)
+        return this.getJson<HubFileDetails>(`/files/${encodedFileId}`)
+    }
+
+    async announceFile(input: AnnounceFileInput): Promise<AnnounceFileResponse> {
+        return this.postJson<AnnounceFileResponse>("/announce", input)
+    }
+
+    private async getJson<T>(path: string): Promise<T> {
+        const response = await fetch(`${this.hubBaseUrl}${path}`)
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => "")
+            const detail = body ? ` - ${body}` : ""
+
+            throw new Error(`GET ${path} falhou com status ${response.status}${detail}`)
+        }
+
+        return response.json() as Promise<T>
+    }
+
+    private async postJson<T>(path: string, body: unknown): Promise<T> {
+        const response = await fetch(`${this.hubBaseUrl}${path}`, {
+            method: "POST",
+            headers: {
+                "content-type": "application/json"
+            },
+            body: JSON.stringify(body)
+        })
+
+        if (!response.ok) {
+            const responseBody = await response.text().catch(() => "")
+            const detail = responseBody ? ` - ${responseBody}` : ""
+
+            throw new Error(`POST ${path} falhou com status ${response.status}${detail}`)
+        }
+
+        return response.json() as Promise<T>
+    }
+
+    async heartbeat(input: HeartbeatInput): Promise<HeartbeatResponse> {
+        return this.postJson<HeartbeatResponse>("/heartbeat", input)
+    }
 }
