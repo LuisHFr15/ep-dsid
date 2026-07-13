@@ -1,13 +1,25 @@
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { ProcessCommand } from "../application/process-command";
+import { SeedStateStore } from "../application/ports/seed-state-store";
+import { TorrentSeeder } from "../application/ports/torrent-seeder";
 import { Worker } from "../application/worker";
 import { Config } from "../infrastructure/config/env";
+import { FileSeedStateStore } from "../infrastructure/persistence/file-seed-state-store";
 import { SqsCommandConsumer } from "../infrastructure/sqs/sqs-command-consumer";
 import { WebTorrentSeeder } from "../infrastructure/webtorrent/webtorrent-seeder";
 
+function log(message: string, err?: unknown) {
+  if (err !== undefined) {
+    console.error(message, err);
+  } else {
+    console.log(message);
+  }
+}
+
 export interface AppContainer {
   worker: Worker;
-  seeder: WebTorrentSeeder;
+  seeder: TorrentSeeder & { close(): Promise<void> };
+  state: SeedStateStore;
 }
 
 export function buildContainer(config: Config): AppContainer {
@@ -17,11 +29,10 @@ export function buildContainer(config: Config): AppContainer {
     config.aws.sqsQueueUrl,
     config.aws.waitTimeSeconds,
   );
-  const seeder = new WebTorrentSeeder(config.seedDir);
-  const processCommand = new ProcessCommand(seeder);
-  const worker = new Worker(consumer, processCommand, (message, err) =>
-    err ? console.error(message, err) : console.log(message),
-  );
+  const seeder = new WebTorrentSeeder(config.seedDir, log);
+  const state = new FileSeedStateStore(config.seedDir, log);
+  const processCommand = new ProcessCommand(state, seeder);
+  const worker = new Worker(consumer, processCommand, log);
 
-  return { worker, seeder };
+  return { worker, seeder, state };
 }

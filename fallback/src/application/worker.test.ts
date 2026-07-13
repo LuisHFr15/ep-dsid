@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Worker } from "./worker";
 import { ProcessCommand } from "./process-command";
-import { FakeCommandConsumer, FakeTorrentSeeder } from "../testing/fakes";
+import { FakeCommandConsumer, FakeSeedStateStore, FakeTorrentSeeder } from "../testing/fakes";
 import { RawMessage } from "./ports/command-consumer";
 
 function msg(body: unknown, receiptHandle: string): RawMessage {
@@ -14,7 +14,7 @@ describe("Worker.processBatch", () => {
     const consumer = new FakeCommandConsumer([
       [msg({ cmd: "JOIN", networkId: "n1", fileId: "f1", infoHash: "h1" }, "r1")],
     ]);
-    const worker = new Worker(consumer, new ProcessCommand(seeder));
+    const worker = new Worker(consumer, new ProcessCommand(new FakeSeedStateStore(), seeder));
 
     const acked = await worker.processBatch();
     expect(acked).toBe(1);
@@ -25,7 +25,7 @@ describe("Worker.processBatch", () => {
   it("acks (discards) a malformed message without processing", async () => {
     const seeder = new FakeTorrentSeeder();
     const consumer = new FakeCommandConsumer([[msg("{not json", "r-bad")]]);
-    const worker = new Worker(consumer, new ProcessCommand(seeder));
+    const worker = new Worker(consumer, new ProcessCommand(new FakeSeedStateStore(), seeder));
 
     const acked = await worker.processBatch();
     expect(acked).toBe(1);
@@ -39,7 +39,7 @@ describe("Worker.processBatch", () => {
     const consumer = new FakeCommandConsumer([
       [msg({ cmd: "JOIN", networkId: "n1", fileId: "f1", infoHash: "h1" }, "r1")],
     ]);
-    const worker = new Worker(consumer, new ProcessCommand(seeder));
+    const worker = new Worker(consumer, new ProcessCommand(new FakeSeedStateStore(), seeder));
 
     const acked = await worker.processBatch();
     expect(acked).toBe(0);
@@ -56,7 +56,7 @@ describe("Worker.processBatch", () => {
         msg({ cmd: "LEAVE", networkId: "n1", fileId: "f2" }, "r-ok"),
       ],
     ]);
-    const worker = new Worker(consumer, new ProcessCommand(seeder));
+    const worker = new Worker(consumer, new ProcessCommand(new FakeSeedStateStore(), seeder));
 
     await worker.processBatch();
     // r-fail: seed falhou -> nao ackado; r-bad: malformado -> ackado; r-ok: LEAVE no-op -> ackado
@@ -65,7 +65,7 @@ describe("Worker.processBatch", () => {
 
   it("returns zero on an empty batch", async () => {
     const seeder = new FakeTorrentSeeder();
-    const worker = new Worker(new FakeCommandConsumer([]), new ProcessCommand(seeder));
+    const worker = new Worker(new FakeCommandConsumer([]), new ProcessCommand(new FakeSeedStateStore(), seeder));
     expect(await worker.processBatch()).toBe(0);
   });
 });
