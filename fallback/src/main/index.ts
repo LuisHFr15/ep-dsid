@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { restoreSeeding } from "../application/restore-seeding";
 import { loadConfig } from "../infrastructure/config/env";
 import { buildContainer } from "./container";
 
@@ -8,6 +9,11 @@ const container = buildContainer(config);
 let running = true;
 
 async function loop() {
+  // Auto-recuperacao: re-semeia o que estava registrado antes de consumir a fila.
+  await restoreSeeding(container.state, container.seeder, (message, err) =>
+    err !== undefined ? console.error(message, err) : console.log(message),
+  );
+
   console.log("fallback worker started");
   while (running) {
     try {
