@@ -1,4 +1,5 @@
 import { CommandConsumer, RawMessage } from "../application/ports/command-consumer";
+import { SeedEntry, SeedStateStore } from "../application/ports/seed-state-store";
 import { TorrentSeeder } from "../application/ports/torrent-seeder";
 
 export class FakeTorrentSeeder implements TorrentSeeder {
@@ -23,6 +24,23 @@ export class FakeTorrentSeeder implements TorrentSeeder {
 
   isSeeding(fileId: string): boolean {
     return this.seeding.has(fileId);
+  }
+}
+
+export class FakeSeedStateStore implements SeedStateStore {
+  entries: SeedEntry[] = [];
+
+  async add(entry: SeedEntry): Promise<void> {
+    this.entries = this.entries.filter((e) => e.fileId !== entry.fileId);
+    this.entries.push(entry);
+  }
+
+  async remove(fileId: string): Promise<void> {
+    this.entries = this.entries.filter((e) => e.fileId !== fileId);
+  }
+
+  async list(): Promise<SeedEntry[]> {
+    return this.entries.map((e) => ({ ...e }));
   }
 }
 
