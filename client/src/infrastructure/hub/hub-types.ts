@@ -8,6 +8,13 @@ import {
   PublishVersionResult
 } from "../../domain/file/network-file.js"
 import { ActivePeersResult, HeartbeatResult } from "../../domain/presence/peer.js"
+import {
+  DecideNetworkAccessResult,
+  NetworkAccessDecision,
+  NetworkAccessRequest,
+  RequestNetworkAccessResult
+} from "../../domain/access/network-access.js"
+
 
 export type HubHealthResponse = HealthStatus
 
@@ -82,3 +89,17 @@ export type PublishVersionRequest = {
 export type PublishVersionResponse = PublishVersionResult
 
 export type PromoteVersionResponse = PromoteVersionResult
+
+export type RequestNetworkAccessResponse =
+  RequestNetworkAccessResult
+
+export type ListNetworkAccessRequestsResponse =
+  NetworkAccessRequest[]
+
+export type DecideNetworkAccessRequest = {
+  userId: string
+  decision: NetworkAccessDecision
+}
+
+export type DecideNetworkAccessResponse =
+  DecideNetworkAccessResult

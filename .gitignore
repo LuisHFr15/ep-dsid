@@ -45,6 +45,7 @@ Thumbs.db
 image.png
 projeto.zip
 ESPECIFICACAO.pdf
+/tools
 
 # DynamoDB local
 dynamodb_local_latest/
@@ -60,3 +61,14 @@ projeto.zip
 # OS / editor
 .idea/
 .vscode/
+
+#lixos diversos
+
+hub-tree.txt
+rotas-hub-incerto.md
+/docs
+
+# Client local state
+client/.client-state.json
+client/.client-session.json
+client/.client-presence.json

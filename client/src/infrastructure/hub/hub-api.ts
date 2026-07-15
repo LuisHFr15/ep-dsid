@@ -17,7 +17,11 @@ import {
   ListVersionsResponse,
   PromoteVersionResponse,
   PublishVersionRequest,
-  PublishVersionResponse
+  PublishVersionResponse,
+  DecideNetworkAccessRequest,
+  DecideNetworkAccessResponse,
+  ListNetworkAccessRequestsResponse,
+  RequestNetworkAccessResponse
 } from "./hub-types.js"
 
 type RequestOptions = {
@@ -184,6 +188,41 @@ export class HubApi {
       method: "GET",
       path: `/networks/${networkId}/peers/`,
       jwt
+    })
+  }
+
+    async requestNetworkAccess(
+    jwt: string,
+    networkId: string
+  ): Promise<RequestNetworkAccessResponse> {
+    return this.requestJson<RequestNetworkAccessResponse>({
+      method: "POST",
+      path: `/networks/${networkId}/access-requests/`,
+      jwt
+    })
+  }
+
+  async listNetworkAccessRequests(
+    jwt: string,
+    networkId: string
+  ): Promise<ListNetworkAccessRequestsResponse> {
+    return this.requestJson<ListNetworkAccessRequestsResponse>({
+      method: "GET",
+      path: `/networks/${networkId}/access-requests/`,
+      jwt
+    })
+  }
+
+  async decideNetworkAccess(
+    jwt: string,
+    networkId: string,
+    input: DecideNetworkAccessRequest
+  ): Promise<DecideNetworkAccessResponse> {
+    return this.requestJson<DecideNetworkAccessResponse>({
+      method: "POST",
+      path: `/networks/${networkId}/access-decisions/`,
+      jwt,
+      body: input
     })
   }
 }
