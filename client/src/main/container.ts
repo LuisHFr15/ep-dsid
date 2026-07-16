@@ -1,3 +1,5 @@
+import { join } from "node:path"
+
 import { GetCurrentSession } from "../application/auth/get-current-session.js"
 import { Login } from "../application/auth/login.js"
 import { Logout } from "../application/auth/logout.js"
@@ -43,6 +45,15 @@ import { ConfigureWorkspace } from "../application/workspace/configure-workspace
 import { GetWorkspaceStatus } from "../application/workspace/get-workspace-status.js"
 import { ListLocalLibrary } from "../application/workspace/list-local-library.js"
 
+import { GetNetworkLocalStatus } from "../application/library/get-network-local-status.js"
+import { ListLibraryNetworks } from "../application/library/list-library-networks.js"
+import { ReconcileLocalLibrary } from "../application/library/reconcile-local-library.js"
+import { RegisterLocalResource } from "../application/library/register-local-resource.js"
+
+import { DownloadCurrentFile } from "../application/torrent/download-current-file.js"
+import { ListTorrentTransfers } from "../application/torrent/list-torrent-transfers.js"
+import { PublishLocalFile } from "../application/torrent/publish-local-file.js"
+
 import { loadClientConfig } from "../infrastructure/config/client-config.js"
 import { HubApi } from "../infrastructure/hub/hub-api.js"
 import { FilePresenceRuntimeStore } from "../infrastructure/presence-runtime/file-presence-runtime-store.js"
@@ -50,6 +61,11 @@ import { FileSessionStore } from "../infrastructure/session/file-session-store.j
 import { FileClientStateStore } from "../infrastructure/state/file-client-state-store.js"
 import { FileWorkspaceStore } from "../infrastructure/workspace/file-workspace-store.js"
 import { NodeLocalLibraryScanner } from "../infrastructure/workspace/node-local-library-scanner.js"
+import { FileLocalLibraryStore } from "../infrastructure/library/file-local-library-store.js"
+import { NodeLocalFileInspector } from "../infrastructure/library/node-local-file-inspector.js"
+
+import { FakeTorrentEngine } from "../infrastructure/torrent/fake-torrent-engine.js"
+import { FileTorrentTransferStore } from "../infrastructure/torrent/file-torrent-transfer-store.js"
 
 import {
   resolveBootstrapDataPaths,
@@ -107,6 +123,14 @@ export type ClientContainer = {
   configureWorkspace: ConfigureWorkspace
   getWorkspaceStatus: GetWorkspaceStatus
   listLocalLibrary: ListLocalLibrary
+
+  publishLocalFile: PublishLocalFile
+  downloadCurrentFile: DownloadCurrentFile
+  listTorrentTransfers: ListTorrentTransfers
+
+  listLibraryNetworks: ListLibraryNetworks
+  getNetworkLocalStatus: GetNetworkLocalStatus
+  reconcileLocalLibrary: ReconcileLocalLibrary
 }
 
 export function buildBootstrapContainer(): BootstrapContainer {
@@ -206,6 +230,102 @@ export function buildClientContainer(
       sessionStore,
       clientStateStore,
       presenceRuntimeStore
+    )
+
+  const refreshNetworkWorkspace =
+    new RefreshNetworkWorkspace(
+      hubApi,
+      sessionStore,
+      clientStateStore
+    )
+
+  const publishSelectedNetworkVersion =
+    new PublishSelectedNetworkVersion(
+      hubApi,
+      sessionStore,
+      clientStateStore
+    )
+
+  const promoteSelectedNetworkVersion =
+    new PromoteSelectedNetworkVersion(
+      hubApi,
+      sessionStore,
+      clientStateStore
+    )
+
+  const getWorkspaceStatus =
+    new GetWorkspaceStatus(
+      workspaceStore
+    )
+
+  const torrentTransferStore =
+    new FileTorrentTransferStore(
+      join(
+        clientPaths.rootDirectory,
+        "transfers.json"
+      )
+    )
+
+  const torrentEngine =
+    new FakeTorrentEngine(
+      torrentTransferStore
+    )
+
+  const localLibraryStore =
+    new FileLocalLibraryStore(
+      join(
+        clientPaths.rootDirectory,
+        "library.json"
+      )
+    )
+
+  const localFileInspector =
+    new NodeLocalFileInspector()
+
+  const registerLocalResource =
+    new RegisterLocalResource(
+      localLibraryStore
+    )
+
+  const publishLocalFile =
+    new PublishLocalFile(
+      getCurrentNetwork,
+      getWorkspaceStatus,
+      torrentEngine,
+      publishSelectedNetworkVersion,
+      promoteSelectedNetworkVersion,
+      refreshNetworkWorkspace,
+      registerLocalResource
+    )
+
+  const downloadCurrentFile =
+    new DownloadCurrentFile(
+      refreshNetworkWorkspace,
+      getWorkspaceStatus,
+      torrentEngine,
+      registerLocalResource
+    )
+
+  const listTorrentTransfers =
+    new ListTorrentTransfers(
+      torrentEngine
+    )
+
+  const listLibraryNetworks =
+    new ListLibraryNetworks(
+      localLibraryStore
+    )
+
+  const getNetworkLocalStatus =
+    new GetNetworkLocalStatus(
+      getCurrentNetwork,
+      localLibraryStore
+    )
+
+  const reconcileLocalLibrary =
+    new ReconcileLocalLibrary(
+      localLibraryStore,
+      localFileInspector
     )
 
   return {
@@ -319,26 +439,11 @@ export function buildClientContainer(
       sessionStore
     ),
 
-    refreshNetworkWorkspace:
-      new RefreshNetworkWorkspace(
-        hubApi,
-        sessionStore,
-        clientStateStore
-      ),
+    refreshNetworkWorkspace,
 
-    publishSelectedNetworkVersion:
-      new PublishSelectedNetworkVersion(
-        hubApi,
-        sessionStore,
-        clientStateStore
-      ),
+    publishSelectedNetworkVersion,
 
-    promoteSelectedNetworkVersion:
-      new PromoteSelectedNetworkVersion(
-        hubApi,
-        sessionStore,
-        clientStateStore
-      ),
+    promoteSelectedNetworkVersion,
 
     createPrivateNetwork:
       new CreatePrivateNetwork(
@@ -372,15 +477,24 @@ export function buildClientContainer(
         workspaceStore
       ),
 
-    getWorkspaceStatus:
-      new GetWorkspaceStatus(
-        workspaceStore
-      ),
+    getWorkspaceStatus,
 
     listLocalLibrary:
       new ListLocalLibrary(
         workspaceStore,
         localLibraryScanner
-      )
+      ),
+
+    publishLocalFile,
+
+    downloadCurrentFile,
+
+    listTorrentTransfers,
+
+    listLibraryNetworks,
+
+    getNetworkLocalStatus,
+
+    reconcileLocalLibrary
   }
 }

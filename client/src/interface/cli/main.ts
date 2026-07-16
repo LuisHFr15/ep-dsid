@@ -165,6 +165,264 @@ async function main(): Promise<void> {
       return
     }
 
+    case "network:publish-local": {
+      const sourceFilePath = requireArg(
+        args,
+        1,
+        "sourceFilePath"
+      )
+
+      const result =
+        await container.publishLocalFile.execute({
+          sourceFilePath
+        })
+
+      console.log("")
+      console.log(
+        "[network:publish-local] Arquivo publicado e promovido."
+      )
+      console.log(`Rede: ${result.networkTitle}`)
+      console.log(`Arquivo: ${result.filename}`)
+      console.log(`Tamanho: ${result.size} bytes`)
+      console.log(`Caminho local: ${result.localPath}`)
+      console.log(`InfoHash fake: ${result.infoHash}`)
+      console.log(`Magnet fake: ${result.magnet}`)
+      console.log(`Version ID: ${result.versionId}`)
+      console.log(`Transfer ID: ${result.transferId}`)
+
+      await container.refreshNetworkWorkspace.execute()
+      return
+    }
+
+    case "network:download-current": {
+      const result =
+        await container.downloadCurrentFile.execute({
+          overwrite: true
+        })
+
+      console.log("")
+      console.log(
+        "[network:download-current] Arquivo baixado."
+      )
+      console.log(`Rede: ${result.networkTitle}`)
+      console.log(`Arquivo: ${result.filename}`)
+      console.log(`Tamanho: ${result.size} bytes`)
+      console.log(`Origem: ${result.sourcePath}`)
+      console.log(`Destino: ${result.destinationPath}`)
+      console.log(
+        `Versão materializada: ${result.versionId}`
+      )
+      console.log(`Transfer ID: ${result.transferId}`)
+      console.log("")
+      console.log(
+        "O download não criou nem promoveu uma nova versão."
+      )
+
+      return
+    }
+
+    case "transfer:list": {
+      const transfers =
+        await container.listTorrentTransfers.execute()
+
+      console.log("")
+      console.log("Transferências")
+      console.log("==============")
+
+      if (transfers.length === 0) {
+        console.log(
+          "Nenhuma transferência registrada."
+        )
+        return
+      }
+
+      for (const transfer of transfers) {
+        console.log("")
+        console.log(transfer.id)
+        console.log(
+          `  direção: ${transfer.direction}`
+        )
+        console.log(
+          `  status: ${transfer.status}`
+        )
+        console.log(
+          `  rede: ${transfer.networkTitle}`
+        )
+        console.log(
+          `  networkId: ${transfer.networkId}`
+        )
+        console.log(
+          `  arquivo: ${transfer.filename}`
+        )
+        console.log(
+          `  origem: ${transfer.sourcePath}`
+        )
+        console.log(
+          `  destino: ${transfer.destinationPath}`
+        )
+        console.log(
+          `  tamanho: ${transfer.size} bytes`
+        )
+        console.log(
+          `  progresso: ${Math.round(
+            transfer.progress * 100
+          )}%`
+        )
+        console.log(
+          `  iniciada em: ${transfer.startedAt}`
+        )
+        console.log(
+          `  concluída em: ${
+            transfer.completedAt ?? "-"
+          }`
+        )
+
+        if (transfer.error) {
+          console.log(
+            `  erro: ${transfer.error}`
+          )
+        }
+      }
+
+      return
+    }
+
+
+case "library:networks": {
+  const networks =
+    await container.listLibraryNetworks.execute()
+
+  console.log("")
+  console.log("Biblioteca por rede")
+  console.log("===================")
+
+  if (networks.length === 0) {
+    console.log(
+      "Nenhuma rede materializada localmente."
+    )
+    return
+  }
+
+  for (const network of networks) {
+    console.log("")
+    console.log(network.networkTitle)
+    console.log(
+      `  networkId: ${network.networkId}`
+    )
+    console.log(
+      `  pasta: ${network.folderName}`
+    )
+
+    if (network.files.length === 0) {
+      console.log(
+        "  nenhum arquivo registrado"
+      )
+      continue
+    }
+
+    for (const file of network.files) {
+      console.log(
+        `  - ${file.filename}`
+      )
+      console.log(
+        `    versão: ${file.versionId}`
+      )
+      console.log(
+        `    origem local: ${file.source}`
+      )
+      console.log(
+        `    disponível: ${file.exists ? "sim" : "não"}`
+      )
+      console.log(
+        `    caminho: ${file.localPath}`
+      )
+    }
+  }
+
+  return
+}
+
+case "network:local-status": {
+  const status =
+    await container.getNetworkLocalStatus.execute()
+
+  console.log("")
+  console.log("Status local da rede")
+  console.log("====================")
+  console.log(`Rede: ${status.networkTitle}`)
+  console.log(`Network ID: ${status.networkId}`)
+  console.log(
+    `Pasta: ${status.folderName ?? "-"}`
+  )
+  console.log(
+    `Situação: ${formatLocalStatus(status.status)}`
+  )
+
+  console.log("")
+  console.log("Arquivo local:")
+
+  if (!status.localFile) {
+    console.log("  não materializado")
+  } else {
+    console.log(
+      `  nome: ${status.localFile.filename}`
+    )
+    console.log(
+      `  versão: ${status.localFile.versionId}`
+    )
+    console.log(
+      `  disponível: ${status.localFile.exists ? "sim" : "não"}`
+    )
+    console.log(
+      `  caminho: ${status.localFile.localPath}`
+    )
+  }
+
+  console.log("")
+  console.log("Arquivo atual no Hub:")
+
+  if (!status.remoteFile) {
+    console.log("  nenhum arquivo atual")
+  } else {
+    console.log(
+      `  nome: ${status.remoteFile.filename}`
+    )
+    console.log(
+      `  versão: ${status.remoteFile.versionId}`
+    )
+    console.log(
+      `  Lamport: ${status.remoteFile.lamportTs}`
+    )
+  }
+
+  return
+}
+
+case "library:reconcile": {
+  const result =
+    await container.reconcileLocalLibrary.execute()
+
+  console.log("")
+  console.log(
+    "[library:reconcile] Biblioteca reconciliada."
+  )
+  console.log(`Redes: ${result.networks}`)
+  console.log(`Arquivos: ${result.files}`)
+  console.log(
+    `Disponíveis: ${result.availableFiles}`
+  )
+  console.log(
+    `Ausentes: ${result.missingFiles}`
+  )
+  console.log(
+    `Com tamanho alterado: ${result.sizeChangedFiles}`
+  )
+  console.log(
+    `Verificado em: ${result.reconciledAt}`
+  )
+  return
+}
+
     case "networks:list": {
       const result = await container.listNetworks.execute()
       printJson("[networks:list] Networks:", result)
@@ -973,6 +1231,33 @@ function printAccessRequests(overview: {
   console.log("  network:reject <número>")
 }
 
+
+function formatLocalStatus(
+  status:
+    | "not-materialized"
+    | "missing"
+    | "current"
+    | "update-available"
+    | "unknown"
+): string {
+  switch (status) {
+    case "not-materialized":
+      return "não materializado"
+
+    case "missing":
+      return "arquivo local ausente"
+
+    case "current":
+      return "atualizado"
+
+    case "update-available":
+      return "atualização disponível"
+
+    case "unknown":
+      return "estado remoto desconhecido"
+  }
+}
+
 function printHelp(): void {
   console.log("Uso:")
   console.log("  npm run dev -- health")
@@ -991,6 +1276,28 @@ function printHelp(): void {
   console.log("  npm run dev -- workspace:configure <diretório>")
   console.log("  npm run dev -- workspace:status")
   console.log("  npm run dev -- library:list")
+  console.log("")
+  console.log("FakeTorrent — MVP 8A:")
+  console.log(
+    "  npm.cmd --prefix client run dev -- network:publish-local <caminho-do-arquivo>"
+  )
+  console.log(
+    "  npm.cmd --prefix client run dev -- network:download-current"
+  )
+  console.log(
+    "  npm.cmd --prefix client run dev -- transfer:list"
+  )
+  console.log("")
+  console.log("Biblioteca estruturada — MVP 8B:")
+  console.log(
+    "  npm.cmd --prefix client run dev -- library:networks"
+  )
+  console.log(
+    "  npm.cmd --prefix client run dev -- network:local-status"
+  )
+  console.log(
+    "  npm.cmd --prefix client run dev -- library:reconcile"
+  )
   console.log("")
   console.log("Networks:")
   console.log("  npm run dev -- networks:list")
