@@ -1,44 +1,50 @@
-import { readFile, rm, writeFile } from "node:fs/promises"
-import { fileURLToPath } from "node:url"
-import { Session } from "../../domain/auth/session.js"
+import { Session } from "../../domain/auth/./session.js"
 import { SessionStore } from "../../domain/auth/session-store.js"
-
-const DEFAULT_SESSION_FILE_PATH = fileURLToPath(
-  new URL("../../../.client-session.json", import.meta.url)
-)
+import {
+  readJsonFile,
+  removeFileIfExists,
+  writeJsonFile
+} from "../filesystem/json-file.js"
 
 export class FileSessionStore implements SessionStore {
-  constructor(private readonly filePath: string = DEFAULT_SESSION_FILE_PATH) {}
+  constructor(
+    private readonly filePath: string
+  ) {}
 
   async load(): Promise<Session | null> {
-    try {
-      const raw = await readFile(this.filePath, "utf-8")
-      const parsed = JSON.parse(raw) as Partial<Session>
+    const session =
+      await readJsonFile<Session>(this.filePath)
 
-      if (!parsed.user || !parsed.jwt) {
-        return null
-      }
-
-      return {
-        user: parsed.user,
-        jwt: parsed.jwt
-      }
-    } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException
-
-      if (nodeError.code === "ENOENT") {
-        return null
-      }
-
-      throw error
+    if (!session) {
+      return null
     }
+
+    validateSession(session)
+
+    return session
   }
 
   async save(session: Session): Promise<void> {
-    await writeFile(this.filePath, JSON.stringify(session, null, 2), "utf-8")
+    validateSession(session)
+
+    await writeJsonFile(this.filePath, session)
   }
 
   async clear(): Promise<void> {
-    await rm(this.filePath, { force: true })
+    await removeFileIfExists(this.filePath)
+  }
+}
+
+function validateSession(
+  session: Session
+): void {
+  if (
+    !session.userId ||
+    !session.user ||
+    !session.jwt
+  ) {
+    throw new Error(
+      "Arquivo de sessão inválido: userId, user e jwt são obrigatórios"
+    )
   }
 }

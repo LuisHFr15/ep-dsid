@@ -72,3 +72,7 @@ rotas-hub-incerto.md
 client/.client-state.json
 client/.client-session.json
 client/.client-presence.json
+
+
+client/.client-data/
+/TorrentHub

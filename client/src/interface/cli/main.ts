@@ -1,26 +1,29 @@
 import { AccessMode, UpdateMode } from "../../domain/network/network.js"
-import { buildClientContainer } from "../../main/container.js"
 import { ClientHomeOverview, NetworkWorkspace } from "../../domain/client/client-home.js"
 import { PresenceRuntimeStatus } from "../../domain/presence-runtime/presence-runtime-state.js"
+import { buildBootstrapContainer, buildClientContainer } from "../../main/container.js"
+import { requireClientDataRoot } from "../../main/client-data-paths.js"
+import { createInterface } from "node:readline/promises"
+import { stdin as input, stdout as output } from "node:process"
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
   const command = args[0]
 
-  const container = buildClientContainer()
-
   switch (command) {
     case "health": {
-      const result = await container.checkHealth.execute()
+      const bootstrapContainer = buildBootstrapContainer()
+      const result = await bootstrapContainer.checkHealth.execute()
       printJson("[health] Hub respondeu:", result)
       return
     }
 
     case "auth:register": {
+      const bootstrapContainer = buildBootstrapContainer()
       const user = requireArg(args, 1, "user")
       const password = requireArg(args, 2, "password")
 
-      const result = await container.registerUser.execute({
+      const result = await bootstrapContainer.registerUser.execute({
         user,
         password
       })
@@ -30,19 +33,43 @@ async function main(): Promise<void> {
     }
 
     case "auth:login": {
+      const bootstrapContainer = buildBootstrapContainer()
       const user = requireArg(args, 1, "user")
       const password = requireArg(args, 2, "password")
 
-      const result = await container.login.execute({
+      const result = await bootstrapContainer.login.execute({
         user,
         password
       })
 
+      console.log("")
       console.log("[auth:login] Login realizado com sucesso.")
       console.log(`Usuário: ${result.user}`)
-      console.log("Sessão salva em client/.client-session.json")
+      console.log(`User ID: ${result.userId}`)
+      console.log("")
+      console.log("Configure este terminal com:")
+      console.log("")
+      console.log(
+        `$env:CLIENT_DATA_DIR = ".client-data\\${result.userId}"`
+      )
+      console.log("")
+      console.log("Depois execute:")
+      console.log("")
+      console.log("npm.cmd --prefix client run dev -- client:init")
       return
     }
+
+    case undefined: {
+      printHelp()
+      return
+    }
+  }
+
+  const container = buildClientContainer(
+    requireClientDataRoot()
+  )
+
+  switch (command) {
 
     case "auth:logout": {
       await container.logout.execute()
@@ -64,7 +91,77 @@ async function main(): Promise<void> {
 
       console.log("[auth:whoami] Sessão atual:")
       console.log(`Usuário: ${session.user}`)
+      console.log(`User ID: ${session.userId}`)
       console.log(`JWT: ${maskJwt(session.jwt)}`)
+      console.log(`Dados locais: ${container.clientDataRoot}`)
+      return
+    }
+
+    case "workspace:configure": {
+      const rootDirectory = requireArg(
+        args,
+        1,
+        "rootDirectory"
+      )
+
+      const workspace =
+        await container.configureWorkspace.execute({
+          rootDirectory
+        })
+
+      console.log("")
+      console.log(
+        "[workspace:configure] Workspace configurada."
+      )
+      console.log(`Diretório: ${workspace.rootDirectory}`)
+      console.log(`Configurada em: ${workspace.configuredAt}`)
+      return
+    }
+
+    case "workspace:status": {
+      const status =
+        await container.getWorkspaceStatus.execute()
+
+      console.log("")
+      console.log("Workspace")
+      console.log("=========")
+      console.log(
+        `Configurada: ${status.configured ? "sim" : "não"}`
+      )
+      console.log(
+        `Diretório: ${status.rootDirectory ?? "-"}`
+      )
+      console.log(
+        `Diretório existe: ${status.directoryExists ? "sim" : "não"}`
+      )
+      console.log(
+        `Dados da instância: ${container.clientDataRoot}`
+      )
+      return
+    }
+
+    case "library:list": {
+      const library =
+        await container.listLocalLibrary.execute()
+
+      console.log("")
+      console.log("Biblioteca Local")
+      console.log("================")
+      console.log(`Workspace: ${library.rootDirectory}`)
+      console.log(`Arquivos: ${library.files.length}`)
+      console.log("")
+
+      if (library.files.length === 0) {
+        console.log("Nenhum arquivo local encontrado.")
+        return
+      }
+
+      for (const file of library.files) {
+        console.log(file.relativePath)
+        console.log(`  tamanho: ${file.size} bytes`)
+        console.log(`  modificado: ${file.modifiedAt}`)
+      }
+
       return
     }
 
@@ -207,13 +304,70 @@ async function main(): Promise<void> {
     }
 
     case "client:init": {
+      const promotion =
+        await container.promotePendingSession.execute()
+
+      if (promotion.promoted) {
+        console.log(
+          `[client:init] Sessão de ${promotion.user} promovida.`
+        )
+      } else {
+        console.log(
+          `[client:init] Sessão de ${promotion.user} já estava inicializada.`
+        )
+      }
+
+      let workspaceStatus =
+        await container.getWorkspaceStatus.execute()
+
+      if (!workspaceStatus.configured) {
+        console.log("")
+        console.log(
+          "Nenhuma pasta de trabalho foi configurada."
+        )
+        console.log("")
+
+        const rootDirectory =
+          await askWorkspaceDirectory()
+
+        const workspace =
+          await container.configureWorkspace.execute({
+            rootDirectory
+          })
+
+        console.log("")
+        console.log(
+          "[client:init] Workspace configurada."
+        )
+        console.log(
+          `Diretório: ${workspace.rootDirectory}`
+        )
+
+        workspaceStatus =
+          await container.getWorkspaceStatus.execute()
+      }
+
+      if (!workspaceStatus.directoryExists) {
+        throw new Error(
+          [
+            "A workspace configurada não existe.",
+            `Diretório: ${workspaceStatus.rootDirectory}`,
+            "",
+            "Use workspace:configure para escolher outra pasta."
+          ].join("\n")
+        )
+      }
+
       const state = await container.initializeClient.execute()
 
+      console.log("")
       console.log("[client:init] Estado local inicializado.")
+      console.log(`Usuário: ${promotion.user}`)
+      console.log(`Dados locais: ${container.clientDataRoot}`)
+      console.log(`Workspace: ${workspaceStatus.rootDirectory}`)
       console.log(`Networks carregadas: ${state.networks.length}`)
       console.log(`Network selecionada: ${state.selectedNetworkId ?? "nenhuma"}`)
       console.log(`Atualizado em: ${state.refreshedAt}`)
-      console.log("Estado salvo em client/.client-state.json")
       return
     }
 
@@ -509,14 +663,32 @@ async function main(): Promise<void> {
       return
     }
 
-    case undefined: {
-      printHelp()
-      return
-    }
-
     default: {
       throw new Error(`Comando desconhecido: ${command}`)
     }
+  }
+}
+
+async function askWorkspaceDirectory(): Promise<string> {
+  const readline = createInterface({
+    input,
+    output
+  })
+
+  try {
+    const answer = await readline.question(
+      "Informe a pasta raiz dos arquivos do TorrentHub:\n> "
+    )
+
+    const directory = answer.trim()
+
+    if (!directory) {
+      throw new Error("Nenhum diretório foi informado")
+    }
+
+    return directory
+  } finally {
+    readline.close()
   }
 }
 
@@ -811,6 +983,15 @@ function printHelp(): void {
   console.log("  npm run dev -- auth:logout")
   console.log("  npm run dev -- auth:whoami")
   console.log("")
+  console.log("Inicialização da instância:")
+  console.log('  $env:CLIENT_DATA_DIR = ".client-data\\<userId>"')
+  console.log("  npm run dev -- client:init")
+  console.log("")
+  console.log("Workspace local:")
+  console.log("  npm run dev -- workspace:configure <diretório>")
+  console.log("  npm run dev -- workspace:status")
+  console.log("  npm run dev -- library:list")
+  console.log("")
   console.log("Networks:")
   console.log("  npm run dev -- networks:list")
   console.log("  npm run dev -- networks:create <title> <description> <accessMode> <updateMode> [tagsCsv]")
@@ -864,7 +1045,12 @@ function printHelp(): void {
   console.log("  npm run dev -- network:reject <pedido-ou-userId> [rede]")
 }
 
-main().catch((error) => {
-  console.error("[erro]", error.message)
-  process.exit(1)
+main().catch((error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error)
+
+  console.error("[erro]", message)
+  process.exitCode = 1
 })

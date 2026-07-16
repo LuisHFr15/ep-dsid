@@ -1,35 +1,43 @@
+import { Session } from "../../domain/auth/./session.js"
 import { SessionStore } from "../../domain/auth/session-store.js"
+import { decodeClientIdentityFromJwt } from "../../infrastructure/auth/decode-jwt-payload.js"
 import { HubApi } from "../../infrastructure/hub/hub-api.js"
-import { Logout } from "./logout.js"
 
 export type LoginInput = {
   user: string
   password: string
 }
 
-export type LoginOutput = {
-  user: string
-  jwt: string
-}
+export type LoginOutput = Session
 
 export class Login {
   constructor(
     private readonly hubApi: HubApi,
-    private readonly sessionStore: SessionStore,
-    private readonly logout: Logout
+    private readonly pendingSessionStore: SessionStore
   ) {}
 
-  async execute(input: LoginInput): Promise<LoginOutput> {
-    await this.logout.execute()
+  async execute(
+    input: LoginInput
+  ): Promise<LoginOutput> {
+    /*
+     * Existe apenas uma sessão provisória por instalação.
+     * Um login novo substitui uma tentativa anterior não concluída.
+     */
+    await this.pendingSessionStore.clear()
 
-    const response = await this.hubApi.authenticateUser(input)
+    const response =
+      await this.hubApi.authenticateUser(input)
 
-    const session: LoginOutput = {
+    const identity =
+      decodeClientIdentityFromJwt(response.jwt)
+
+    const session: Session = {
+      userId: identity.userId,
       user: input.user,
       jwt: response.jwt
     }
 
-    await this.sessionStore.save(session)
+    await this.pendingSessionStore.save(session)
 
     return session
   }

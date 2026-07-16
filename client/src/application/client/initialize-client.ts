@@ -2,7 +2,10 @@ import { SessionStore } from "../../domain/auth/session-store.js"
 import { ClientState } from "../../domain/client/client-state.js"
 import { ClientStateStore } from "../../domain/client/client-state-store.js"
 import { ActivePeersResult } from "../../domain/presence/peer.js"
-import { FileVersionsResult, NetworkFile } from "../../domain/file/network-file.js"
+import {
+  FileVersionsResult,
+  NetworkFile
+} from "../../domain/file/network-file.js"
 import { HubApi } from "../../infrastructure/hub/hub-api.js"
 
 export class InitializeClient {
@@ -16,33 +19,58 @@ export class InitializeClient {
     const session = await this.sessionStore.load()
 
     if (!session) {
-      throw new Error("Você precisa fazer login antes. Rode: auth:login <user> <password>")
+      throw new Error(
+        "Você precisa fazer login antes. Rode: auth:login <user> <password>"
+      )
     }
 
-    const previousState = await this.clientStateStore.load()
-    const networks = await this.hubApi.listNetworks(session.jwt)
+    const previousState =
+      await this.clientStateStore.load()
 
-    const currentFilesByNetworkId: Record<string, NetworkFile | null> = {}
-    const versionsByNetworkId: Record<string, FileVersionsResult | null> = {}
-    const peersByNetworkId: Record<string, ActivePeersResult | null> = {}
+    const networks =
+      await this.hubApi.listNetworks(session.jwt)
+
+    const currentFilesByNetworkId:
+      Record<string, NetworkFile | null> = {}
+
+    const versionsByNetworkId:
+      Record<string, FileVersionsResult | null> = {}
+
+    const peersByNetworkId:
+      Record<string, ActivePeersResult | null> = {}
 
     for (const network of networks) {
-      const currentFile = await this.safeGetCurrentFile(session.jwt, network.id)
-      currentFilesByNetworkId[network.id] = currentFile
+      const currentFile =
+        await this.safeGetCurrentFile(
+          session.jwt,
+          network.id
+        )
+
+      currentFilesByNetworkId[network.id] =
+        currentFile
 
       if (currentFile) {
-        versionsByNetworkId[network.id] = await this.safeListVersions(session.jwt, network.id)
+        versionsByNetworkId[network.id] =
+          await this.safeListVersions(
+            session.jwt,
+            network.id
+          )
       } else {
         versionsByNetworkId[network.id] = null
       }
 
-      peersByNetworkId[network.id] = await this.safeListPeers(session.jwt, network.id)
+      peersByNetworkId[network.id] =
+        await this.safeListPeers(
+          session.jwt,
+          network.id
+        )
     }
 
-    const selectedNetworkId = this.resolveSelectedNetworkId(
-      previousState?.selectedNetworkId ?? null,
-      networks.map((network) => network.id)
-    )
+    const selectedNetworkId =
+      this.resolveSelectedNetworkId(
+        previousState?.selectedNetworkId ?? null,
+        networks.map((network) => network.id)
+      )
 
     const state: ClientState = {
       selectedNetworkId,
@@ -62,18 +90,29 @@ export class InitializeClient {
     previousSelectedNetworkId: string | null,
     availableNetworkIds: string[]
   ): string | null {
-    if (previousSelectedNetworkId && availableNetworkIds.includes(previousSelectedNetworkId)) {
+    if (
+      previousSelectedNetworkId &&
+      availableNetworkIds.includes(
+        previousSelectedNetworkId
+      )
+    ) {
       return previousSelectedNetworkId
     }
 
     return availableNetworkIds[0] ?? null
   }
 
-  private async safeGetCurrentFile(jwt: string, networkId: string): Promise<NetworkFile | null> {
+  private async safeGetCurrentFile(
+    jwt: string,
+    networkId: string
+  ): Promise<NetworkFile | null> {
     try {
-      return await this.hubApi.getCurrentFile(jwt, networkId)
+      return await this.hubApi.getCurrentFile(
+        jwt,
+        networkId
+      )
     } catch (error) {
-      if (isNotFoundError(error)) {
+      if (isUnavailableNetworkContentError(error)) {
         return null
       }
 
@@ -81,11 +120,17 @@ export class InitializeClient {
     }
   }
 
-  private async safeListVersions(jwt: string, networkId: string): Promise<FileVersionsResult | null> {
+  private async safeListVersions(
+    jwt: string,
+    networkId: string
+  ): Promise<FileVersionsResult | null> {
     try {
-      return await this.hubApi.listVersions(jwt, networkId)
+      return await this.hubApi.listVersions(
+        jwt,
+        networkId
+      )
     } catch (error) {
-      if (isNotFoundError(error)) {
+      if (isUnavailableNetworkContentError(error)) {
         return null
       }
 
@@ -93,11 +138,17 @@ export class InitializeClient {
     }
   }
 
-  private async safeListPeers(jwt: string, networkId: string): Promise<ActivePeersResult | null> {
+  private async safeListPeers(
+    jwt: string,
+    networkId: string
+  ): Promise<ActivePeersResult | null> {
     try {
-      return await this.hubApi.listActivePeers(jwt, networkId)
+      return await this.hubApi.listActivePeers(
+        jwt,
+        networkId
+      )
     } catch (error) {
-      if (isNotFoundError(error)) {
+      if (isUnavailableNetworkContentError(error)) {
         return null
       }
 
@@ -106,6 +157,15 @@ export class InitializeClient {
   }
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes("status 404")
+function isUnavailableNetworkContentError(
+  error: unknown
+): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return (
+    error.message.includes("status 403") ||
+    error.message.includes("status 404")
+  )
 }
