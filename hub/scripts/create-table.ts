@@ -10,7 +10,12 @@ async function main() {
   const config = loadConfig();
   const client = new DynamoDBClient({
     region: config.aws.region,
-    ...(config.aws.dynamoEndpoint ? { endpoint: config.aws.dynamoEndpoint } : {}),
+    ...(config.aws.dynamoEndpoint
+        ? {
+          endpoint: config.aws.dynamoEndpoint,
+          credentials: { accessKeyId: "dummy", secretAccessKey: "dummy" }
+        }
+        : {}),
   });
 
   try {

@@ -5,7 +5,12 @@ import { Config } from "../config/env";
 export function createDocumentClient(config: Config): DynamoDBDocumentClient {
   const client = new DynamoDBClient({
     region: config.aws.region,
-    ...(config.aws.dynamoEndpoint ? { endpoint: config.aws.dynamoEndpoint } : {}),
+    ...(config.aws.dynamoEndpoint
+        ? {
+          endpoint: config.aws.dynamoEndpoint,
+          credentials: { accessKeyId: "dummy", secretAccessKey: "dummy" }
+        }
+        : {}),
   });
 
   return DynamoDBDocumentClient.from(client, {
