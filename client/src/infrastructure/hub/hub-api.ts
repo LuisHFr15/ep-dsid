@@ -1,3 +1,4 @@
+import { HubConnectionError } from "../../domain/errors/app-error.js"
 import {
   AuthenticateUserRequest,
   AuthenticateUserResponse,
@@ -101,7 +102,7 @@ export class HubApi {
       const body = await response.text().catch(() => "")
       const detail = body ? ` - ${body}` : ""
 
-      throw new Error(`${options.method} ${options.path} falhou com status ${response.status}${detail}`)
+      throw new HubConnectionError(options.method, options.path, response.status)
     }
 
     return response.json() as Promise<T>
