@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto"
-import { copyFile, mkdir, stat } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import { copyFile, mkdir, readFile, stat } from "node:fs/promises"
 import { basename, dirname, join, resolve } from "node:path"
 
 import {
@@ -123,15 +123,14 @@ export class FakeTorrentEngine implements TorrentEngine {
 
   private async createFakeResource(filePath: string): Promise<TorrentResource> {
     const fileStat = await stat(filePath)
+    const content = await readFile(filePath)
+    const infoHash = createHash("sha1").update(content).digest("hex")
 
-    // TEMP-MVP8A:
-    // infoHash e magnet apontam para a cópia física local.
-    // Ambos devem ser substituídos por valores reais no WebTorrentEngine.
     return {
       filename: basename(filePath),
       size: fileStat.size,
-      infoHash: filePath,
-      magnet: filePath,
+      infoHash,
+      magnet: `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(basename(filePath))}`,
       filePath
     }
   }
