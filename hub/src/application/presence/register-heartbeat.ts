@@ -1,7 +1,7 @@
 import { NotFoundError } from "../../domain/errors/domain-error";
 import { createPresence } from "../../domain/peer/peer-presence";
 import { PeerPresenceStore } from "../../domain/peer/peer-presence-store";
-import { FALLBACK_THRESHOLD, partitionPresence } from "../../domain/peer/presence-policy";
+import { partitionPresence } from "../../domain/peer/presence-policy";
 import { MembershipRepository } from "../../domain/network/membership-repository";
 import { NetworkRepository } from "../../domain/network/network-repository";
 import { assertCanRead } from "../network/access-guards";
@@ -16,7 +16,6 @@ export interface RegisterHeartbeatResult {
   networkId: string;
   peerId: string;
   activePeers: number;
-  shouldActivateFallback: boolean;
 }
 
 export class RegisterHeartbeat {
@@ -49,7 +48,6 @@ export class RegisterHeartbeat {
       networkId: input.networkId,
       peerId: input.peerId,
       activePeers: active.length,
-      shouldActivateFallback: active.length <= FALLBACK_THRESHOLD,
     };
   }
 }

@@ -37,7 +37,6 @@ describe("RegisterHeartbeat", () => {
       userId: "alice",
     });
     expect(result.activePeers).toBe(1);
-    expect(result.shouldActivateFallback).toBe(true);
   });
 
   it("marks a peer offline after 30s without a beat", async () => {
@@ -76,7 +75,6 @@ describe("RegisterHeartbeat", () => {
       result = await heartbeat.execute({ networkId: network.id, peerId, userId: "alice" });
     }
     expect(result?.activePeers).toBe(5);
-    expect(result?.shouldActivateFallback).toBe(false);
   });
 
   it("forbids a non-member on a private network", async () => {
