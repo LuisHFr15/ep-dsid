@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { SessionStore } from "../../domain/auth/session-store.js"
 import { ClientStateStore } from "../../domain/client/client-state-store.js"
 import {
@@ -41,7 +42,6 @@ export class InitializePresenceRuntime {
         online: previousNetworkState?.online ?? true,
         lastHeartbeatAt: previousNetworkState?.lastHeartbeatAt ?? null,
         lastActivePeers: previousNetworkState?.lastActivePeers ?? null,
-        lastShouldActivateFallback: previousNetworkState?.lastShouldActivateFallback ?? null,
         lastError: previousNetworkState?.lastError ?? null
       }
     }
@@ -52,7 +52,7 @@ export class InitializePresenceRuntime {
         input.intervalMs ??
         previousPresence?.defaultHeartbeatIntervalMs ??
         10000,
-      peerId: previousPresence?.peerId ?? `peer-${session.user}`,
+      peerId: previousPresence?.peerId ?? randomUUID(),
       networks,
       updatedAt: new Date().toISOString()
     }

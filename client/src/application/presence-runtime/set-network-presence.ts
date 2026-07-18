@@ -36,7 +36,6 @@ export class SetNetworkPresence {
         online: input.online,
         lastHeartbeatAt: null,
         lastActivePeers: null,
-        lastShouldActivateFallback: null,
         lastError: null
       }
     } else {

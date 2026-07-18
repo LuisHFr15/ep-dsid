@@ -2,7 +2,6 @@ export type PresenceRuntimeNetworkState = {
   online: boolean
   lastHeartbeatAt: string | null
   lastActivePeers: number | null
-  lastShouldActivateFallback: boolean | null
   lastError: string | null
 }
 
@@ -21,7 +20,6 @@ export type PresenceRuntimeNetworkStatus = {
   online: boolean
   lastHeartbeatAt: string | null
   lastActivePeers: number | null
-  lastShouldActivateFallback: boolean | null
   lastError: string | null
 }
 

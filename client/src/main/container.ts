@@ -39,7 +39,7 @@ import { GetPresenceRuntimeStatus } from "../application/presence-runtime/get-pr
 import { InitializePresenceRuntime } from "../application/presence-runtime/initialize-presence-runtime.js"
 import { SetGlobalPresence } from "../application/presence-runtime/set-global-presence.js"
 import { SetNetworkPresence } from "../application/presence-runtime/set-network-presence.js"
-import { StartPresenceRuntime } from "../application/presence-runtime/start-presence-runtime.js"
+import { PresenceRuntime } from "../application/presence-runtime/presence-runtime.js"
 
 import { ConfigureWorkspace } from "../application/workspace/configure-workspace.js"
 import { GetWorkspaceStatus } from "../application/workspace/get-workspace-status.js"
@@ -109,7 +109,7 @@ export type ClientContainer = {
   getPresenceRuntimeStatus: GetPresenceRuntimeStatus
   setGlobalPresence: SetGlobalPresence
   setNetworkPresence: SetNetworkPresence
-  startPresenceRuntime: StartPresenceRuntime
+  presenceRuntime: PresenceRuntime
 
   refreshNetworkWorkspace: RefreshNetworkWorkspace
   publishSelectedNetworkVersion: PublishSelectedNetworkVersion
@@ -380,7 +380,7 @@ export function buildClientContainer(
       initializePresenceRuntime
     ),
 
-    startPresenceRuntime: new StartPresenceRuntime(
+    presenceRuntime: new PresenceRuntime(
       hubApi,
       sessionStore,
       clientStateStore,

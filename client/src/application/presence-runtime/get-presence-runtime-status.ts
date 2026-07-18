@@ -47,7 +47,6 @@ export class GetPresenceRuntimeStatus {
           online: networkPresence?.online ?? false,
           lastHeartbeatAt: networkPresence?.lastHeartbeatAt ?? null,
           lastActivePeers: networkPresence?.lastActivePeers ?? null,
-          lastShouldActivateFallback: networkPresence?.lastShouldActivateFallback ?? null,
           lastError: networkPresence?.lastError ?? null
         }
       })
