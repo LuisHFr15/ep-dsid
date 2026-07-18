@@ -4,7 +4,6 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx src/interface/cli/main.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },
