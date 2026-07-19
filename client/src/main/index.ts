@@ -1,8 +1,22 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron"
 import path from "node:path"
+import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
+import { FakeTorrentEngine } from "../infrastructure/torrent/fake-torrent-engine.js"
+import { FileTorrentTransferStore } from "../infrastructure/torrent/file-torrent-transfer-store.js"
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
 declare const MAIN_WINDOW_VITE_NAME: string
+
+let container: ElectronContainer
+
+function buildContainer(): ElectronContainer {
+  const dataRoot = app.getPath("userData")
+  const hubBaseUrl = process.env.HUB_BASE_URL ?? "http://localhost:3000"
+  const torrentEngine = new FakeTorrentEngine(
+    new FileTorrentTransferStore(path.join(dataRoot, "transfers.json")),
+  )
+  return buildElectronContainer(dataRoot, hubBaseUrl, torrentEngine)
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -28,6 +42,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  container = buildContainer()
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -18,7 +18,8 @@
     "src/domain",
     "src/application",
     "src/infrastructure",
-    "src/testing"
+    "src/testing",
+    "src/main/electron-container.ts"
   ],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
