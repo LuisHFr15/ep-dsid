@@ -38,6 +38,9 @@ const config: ForgeConfig = {
         name: 'ep-dsid',
         productName: 'EP-DSID',
         bin: 'ep-dsid',
+        description: 'Cliente EP-DSID de compartilhamento de arquivos P2P',
+        productDescription:
+          'App desktop do EP-DSID: compartilhamento de arquivos P2P (WebTorrent) coordenado por um hub central.',
       },
     }),
   ],
