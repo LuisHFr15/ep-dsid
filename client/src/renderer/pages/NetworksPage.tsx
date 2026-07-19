@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import * as api from '../api'
+import { api } from '../ipc-client'
 import type { Network } from '../types'
 
 export function NetworksPage() {
@@ -16,8 +16,18 @@ export function NetworksPage() {
     if (!session) return
     setLoading(true)
     try {
-      const data = await api.listNetworks(session.jwt, q ? { q } : undefined)
-      setNetworks(data)
+      const data = await api.listNetworks()
+      const filtered = q
+        ? data.filter((n) => {
+            const needle = q.toLowerCase()
+            return (
+              n.title.toLowerCase().includes(needle) ||
+              (n.description ?? '').toLowerCase().includes(needle) ||
+              n.tags.some((t) => t.toLowerCase().includes(needle))
+            )
+          })
+        : data
+      setNetworks(filtered)
     } finally {
       setLoading(false)
     }
@@ -93,7 +103,6 @@ export function NetworksPage() {
 
       {showCreate && (
         <CreateNetworkModal
-          jwt={session!.jwt}
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load() }}
         />
@@ -103,11 +112,9 @@ export function NetworksPage() {
 }
 
 function CreateNetworkModal({
-  jwt,
   onClose,
   onCreated
 }: {
-  jwt: string
   onClose: () => void
   onCreated: () => void
 }) {
@@ -124,7 +131,7 @@ function CreateNetworkModal({
     setError('')
     setLoading(true)
     try {
-      await api.createNetwork(jwt, {
+      await api.createNetwork({
         title,
         description: description || undefined,
         tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],

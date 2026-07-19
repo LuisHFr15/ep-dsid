@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useHeartbeat } from '../hooks/useHeartbeat'
+import { useInterval } from '../hooks/useInterval'
 import { VersionTree } from '../components/VersionTree'
-import * as api from '../api'
-import type { Network, FileVersion, FileVersionsResult, NetworkAccessRequest } from '../types'
+import { api } from '../ipc-client'
+import type { Network, FileVersion, FileVersionsResult, NetworkAccessRequest, ActivePeer } from '../types'
 
 type Tab = 'arquivo' | 'versoes' | 'peers' | 'acesso'
 
@@ -17,32 +17,31 @@ export function NetworkDetailPage() {
   const [currentFile, setCurrentFile] = useState<FileVersion | null>(null)
   const [versionsResult, setVersionsResult] = useState<FileVersionsResult | null>(null)
   const [accessRequests, setAccessRequests] = useState<NetworkAccessRequest[]>([])
+  const [peers, setPeers] = useState<ActivePeer[]>([])
   const [tab, setTab] = useState<Tab>('arquivo')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [announcing, setAnnouncing] = useState(false)
-
-  const { peers, fallbackActive, peerId } = useHeartbeat(id ?? null)
+  const [busy, setBusy] = useState(false)
 
   const isOwner = session && network ? session.userId === network.ownerId : false
-  const canContribute =
-    isOwner || network?.updateMode === 'collaborative'
+  const canContribute = isOwner || network?.updateMode === 'collaborative'
+  const fallbackLikely = peers.length <= 4
 
   const load = useCallback(async () => {
     if (!session || !id) return
     setLoading(true)
     setError('')
     try {
-      // Load network info from listing (hub doesn't have GET /networks/:id directly)
-      const nets = await api.listNetworks(session.jwt)
+      // O hub não tem GET /networks/:id direto; filtramos da listagem.
+      const nets = await api.listNetworks()
       const found = nets.find(n => n.id === id)
       if (!found) { navigate('/networks'); return }
       setNetwork(found)
 
       if (found.activeFileId) {
         const [file, versions] = await Promise.all([
-          api.getCurrentFile(session.jwt, id),
-          api.listVersions(session.jwt, id)
+          api.getCurrentFile(id) as Promise<FileVersion>,
+          api.listVersions(id)
         ])
         setCurrentFile(file)
         setVersionsResult(versions)
@@ -56,37 +55,50 @@ export function NetworkDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (tab === 'acesso' && isOwner && session && id) {
-      api.listAccessRequests(session.jwt, id).then(setAccessRequests).catch(() => {})
-    }
-  }, [tab, isOwner, session, id])
+  // Presença: enquanto a página está aberta, atualiza a lista de peers ativos.
+  useInterval(() => {
+    if (!id) return
+    api.listPeers(id).then(r => setPeers(r.activePeers)).catch(() => {})
+  }, 10000)
 
-  async function handleAnnounce(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !session || !id) return
-    setAnnouncing(true)
+  useEffect(() => {
+    if (tab === 'acesso' && isOwner && id) {
+      api.listAccessRequests(id).then(setAccessRequests).catch(() => {})
+    }
+  }, [tab, isOwner, id])
+
+  async function handleAnnounce() {
+    if (!id) return
+    const filePath = await api.openFilePicker()
+    if (!filePath) return
+    setBusy(true)
     try {
-      const infoHash = crypto.randomUUID()
-      await api.announceFile(session.jwt, id, {
-        filename: file.name,
-        size: file.size,
-        infoHash,
-        magnet: `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(file.name)}`
-      })
+      await api.publishLocal(id, filePath)
       await load()
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erro ao anunciar arquivo')
     } finally {
-      setAnnouncing(false)
-      e.target.value = ''
+      setBusy(false)
+    }
+  }
+
+  async function handleDownload() {
+    if (!id) return
+    setBusy(true)
+    try {
+      await api.downloadCurrent(id)
+      alert('Download concluído no seu workspace.')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao baixar arquivo')
+    } finally {
+      setBusy(false)
     }
   }
 
   async function handleRequestAccess() {
-    if (!session || !id) return
+    if (!id) return
     try {
-      await api.requestAccess(session.jwt, id)
+      await api.requestAccess(id)
       alert('Pedido enviado!')
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Erro')
@@ -94,9 +106,9 @@ export function NetworkDetailPage() {
   }
 
   async function handleDecide(userId: string, decision: 'approve' | 'reject') {
-    if (!session || !id) return
+    if (!id) return
     try {
-      await api.decideAccess(session.jwt, id, userId, decision)
+      await api.decideAccess(id, userId, decision)
       setAccessRequests(prev => prev.filter(r => r.userId !== userId))
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Erro')
@@ -104,9 +116,9 @@ export function NetworkDetailPage() {
   }
 
   async function handlePromote(versionId: string) {
-    if (!session || !id) return
+    if (!id) return
     try {
-      await api.promoteVersion(session.jwt, id, versionId)
+      await api.promoteVersion(id, versionId)
       await load()
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Erro ao promover versão')
@@ -130,7 +142,6 @@ export function NetworkDetailPage() {
 
   return (
     <div className="network-detail">
-      {/* Header */}
       <div className="page-header">
         <div>
           <button
@@ -151,11 +162,6 @@ export function NetworkDetailPage() {
             <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
               {peers.length} peer{peers.length !== 1 ? 's' : ''} online
             </span>
-            {fallbackActive && (
-              <span style={{ color: 'var(--warning)', fontSize: 13 }}>
-                ⚠ fallback ativo
-              </span>
-            )}
           </div>
           {network.description && (
             <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
@@ -170,7 +176,6 @@ export function NetworkDetailPage() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="tabs">
         {(['arquivo', 'versoes', 'peers', 'acesso'] as Tab[]).map(t => (
           <button
@@ -178,12 +183,7 @@ export function NetworkDetailPage() {
             className={`tab-btn${tab === t ? ' active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {{
-              arquivo: 'Arquivo',
-              versoes: 'Versões',
-              peers: 'Peers',
-              acesso: 'Acesso'
-            }[t]}
+            {{ arquivo: 'Arquivo', versoes: 'Versões', peers: 'Peers', acesso: 'Acesso' }[t]}
             {t === 'acesso' && isOwner && accessRequests.length > 0 && (
               <span
                 style={{
@@ -202,7 +202,6 @@ export function NetworkDetailPage() {
         ))}
       </div>
 
-      {/* Tab content */}
       {tab === 'arquivo' && (
         <div>
           {currentFile ? (
@@ -221,9 +220,9 @@ export function NetworkDetailPage() {
                 </span>
               </div>
               <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                  Download P2P disponível no MVP 9 (WebTorrent)
-                </span>
+                <button className="btn btn-primary" onClick={handleDownload} disabled={busy}>
+                  {busy ? <span className="spinner" /> : 'Baixar (P2P)'}
+                </button>
                 <button className="btn btn-ghost" onClick={load}>
                   Atualizar
                 </button>
@@ -233,21 +232,14 @@ export function NetworkDetailPage() {
             <div className="empty">
               <p>Nenhum arquivo anunciado nesta rede ainda.</p>
               {isOwner && (
-                <>
-                  <input
-                    type="file"
-                    id="file-announce"
-                    style={{ display: 'none' }}
-                    onChange={handleAnnounce}
-                  />
-                  <label
-                    htmlFor="file-announce"
-                    className="btn btn-primary"
-                    style={{ display: 'inline-block', marginTop: 16, cursor: 'pointer' }}
-                  >
-                    {announcing ? <span className="spinner" /> : 'Selecionar arquivo'}
-                  </label>
-                </>
+                <button
+                  className="btn btn-primary"
+                  style={{ marginTop: 16 }}
+                  onClick={handleAnnounce}
+                  disabled={busy}
+                >
+                  {busy ? <span className="spinner" /> : 'Selecionar arquivo'}
+                </button>
               )}
             </div>
           )}
@@ -264,36 +256,26 @@ export function NetworkDetailPage() {
 
       {tab === 'peers' && (
         <div>
-          {fallbackActive && (
+          {fallbackLikely && (
             <div className="fallback-notice">
-              ⚠ Fallback do servidor ativo — poucos peers humanos online (≤4).
+              ⚠ Poucos peers humanos online (≤4) — o fallback do servidor tende a entrar.
             </div>
           )}
           <div className="peers-list">
-            <div className="peer-item">
-              <div className="peer-dot" />
-              <span style={{ fontWeight: 600 }}>Você</span>
-              <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                {peerId.slice(0, 8)}…
-              </span>
-            </div>
-            {peers
-              .filter(p => p.peerId !== peerId)
-              .map(p => (
-                <div key={p.peerId} className="peer-item">
-                  <div className="peer-dot" />
-                  <span>{p.userId.slice(0, 8)}…</span>
-                  <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                    {p.peerId.slice(0, 8)}…
-                  </span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                    {timeAgo(p.lastSeenAt)}
-                  </span>
-                </div>
-              ))}
-            {peers.length <= 1 && (
+            {peers.map(p => (
+              <div key={p.peerId} className="peer-item">
+                <div className="peer-dot" />
+                <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }}>
+                  {p.peerId.slice(0, 8)}…
+                </span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                  {timeAgo(p.lastSeenAt)}
+                </span>
+              </div>
+            ))}
+            {peers.length === 0 && (
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 8 }}>
-                Nenhum outro peer online no momento.
+                Nenhum peer online no momento.
               </p>
             )}
           </div>

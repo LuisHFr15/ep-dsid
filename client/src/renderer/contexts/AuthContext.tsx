@@ -1,35 +1,33 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import type { Session } from '../types'
-import * as api from '../api'
+import { api } from '../ipc-client'
+
+export interface RendererSession {
+  userId: string
+  username: string
+}
 
 interface AuthContextValue {
-  session: Session | null
+  session: RendererSession | null
+  loading: boolean
   login: (username: string, password: string) => Promise<void>
   register: (username: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const SESSION_KEY = 'ep_dsid_session'
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY)
-      return raw ? (JSON.parse(raw) as Session) : null
-    } catch {
-      return null
-    }
-  })
+  const [session, setSession] = useState<RendererSession | null>(null)
+  const [loading, setLoading] = useState(true)
 
+  // O main é o dono da sessão; hidratamos a partir dele no boot.
   useEffect(() => {
-    if (session) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(session))
-    } else {
-      localStorage.removeItem(SESSION_KEY)
-    }
-  }, [session])
+    api
+      .session()
+      .then((s) => setSession(s))
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false))
+  }, [])
 
   async function login(username: string, password: string) {
     const s = await api.login(username, password)
@@ -41,12 +39,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await login(username, password)
   }
 
-  function logout() {
+  async function logout() {
+    await api.logout()
     setSession(null)
   }
 
   return (
-    <AuthContext.Provider value={{ session, login, register, logout }}>
+    <AuthContext.Provider value={{ session, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   )
