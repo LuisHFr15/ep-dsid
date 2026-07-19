@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron"
 import path from "node:path"
 import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
+import { buildIpcMap } from "./ipc-map.js"
+import { registerIpcHandlers } from "./ipc.js"
 import { WebTorrentEngine } from "../infrastructure/torrent/webtorrent-engine.js"
 import { FileTorrentTransferStore } from "../infrastructure/torrent/file-torrent-transfer-store.js"
 
@@ -44,6 +46,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   container = buildContainer()
+  registerIpcHandlers(buildIpcMap(container))
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

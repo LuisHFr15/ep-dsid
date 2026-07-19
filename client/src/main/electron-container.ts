@@ -9,6 +9,7 @@ import { ListNetworkAccessRequests } from "../application/access/list-network-ac
 import { RequestNetworkAccess } from "../application/access/request-network-access.js"
 import { GetCurrentNetwork } from "../application/client/get-current-network.js"
 import { InitializeClient } from "../application/client/initialize-client.js"
+import { SelectNetwork } from "../application/client/select-network.js"
 import { PromoteSelectedNetworkVersion } from "../application/client/promote-selected-network-version.js"
 import { PublishSelectedNetworkVersion } from "../application/client/publish-selected-network-version.js"
 import { RefreshNetworkWorkspace } from "../application/client/refresh-network-workspace.js"
@@ -43,6 +44,7 @@ export type ElectronContainer = {
   getCurrentSession: GetCurrentSession
   initializeClient: InitializeClient
   getCurrentNetwork: GetCurrentNetwork
+  selectNetwork: SelectNetwork
   listNetworks: ListNetworks
   createNetwork: CreateNetwork
   getCurrentFile: GetCurrentFile
@@ -93,6 +95,7 @@ export function buildElectronContainer(
     getCurrentSession: new GetCurrentSession(sessionStore),
     initializeClient,
     getCurrentNetwork,
+    selectNetwork: new SelectNetwork(clientStateStore),
     listNetworks: new ListNetworks(hubApi, sessionStore),
     createNetwork: new CreateNetwork(hubApi, sessionStore),
     getCurrentFile: new GetCurrentFile(hubApi, sessionStore),
