@@ -29,11 +29,12 @@ client/
   src/
     domain/                # tipos puros + portas (zero I/O)
     application/           # use cases (um por operação; PresenceRuntime start/stop)
-    infrastructure/        # adapters: hub-api, stores, fake-torrent-engine, torrent-protocol
+    infrastructure/        # adapters: hub-api, stores, webtorrent-engine
     main/
-      index.ts             # Electron main: janela + lifecycle
-      ipc.ts               # IPC handlers → use cases, envelope de erro
-      container.ts         # composition root
+      index.ts             # Electron main: janela + lifecycle + wiring
+      ipc.ts               # registerIpcHandlers (envelope de erro)
+      ipc-map.ts           # mapa canal → use case
+      electron-container.ts # composition root (userData, sessão única)
     preload/preload.ts     # contextBridge: invoke + on
     renderer/              # React: pages, components, hooks, contexts, ipc-client, types, styles
     testing/               # fakes para vitest
@@ -51,8 +52,7 @@ cp .env.example .env            # (se existir; senão os defaults valem)
 
 Variáveis de ambiente relevantes (todas opcionais com default):
 - `HUB_BASE_URL` — padrão `http://localhost:3000`
-- `TORRENT_ENGINE` — `fake` (padrão) ou `webtorrent`
-- Electron resolve `userData` automaticamente (`~/Library/Application Support/@ep-dsid-client` no macOS).
+- Electron resolve `userData` automaticamente (`~/Library/Application Support/@ep-dsid-client` no macOS) — é onde ficam sessão, estado, workspace e transfers do perfil.
 
 ---
 
@@ -72,14 +72,11 @@ npm test                    # vitest (core, sem Electron/React)
 
 ---
 
-## 5. Engine fake vs WebTorrent real
+## 5. Engine de torrent — WebTorrent
 
-| Engine | Quando usar | Como funciona |
-|---|---|---|
-| `fake` (padrão) | Dev/demo na mesma máquina ou entre máquinas que compartilham o `fake-swarm.json` | Copia o arquivo para o workspace, calcula sha1 como infoHash, registra num JSON compartilhado. Download resolve pelo registro. |
-| `webtorrent` | Teste real P2P entre máquinas | `utilityProcess` com WebTorrent: seed/add reais, transferência pela rede via trackers |
+O cliente usa **WebTorrent real** (`WebTorrentEngine`, no processo main). Publicar semeia o arquivo (`client.seed`), gerando `infoHash`/`magnet` reais; baixar entra no swarm pelo magnet (`client.add`) e grava no workspace. Por isso o download P2P só funciona numa rede **sem bloqueio de BitTorrent** (não a corporativa).
 
-Para mudar: `TORRENT_ENGINE=webtorrent npm run dev`.
+> Não há mais engine "fake". O `npm install` baixa o `webtorrent`; se o download travar por proxy, use `ELECTRON_MIRROR`/`npm_config_registry` conforme sua rede.
 
 ---
 
@@ -89,16 +86,15 @@ Para mudar: `TORRENT_ENGINE=webtorrent npm run dev`.
 1. Suba o hub (local ou na EC2 da AWS) conforme `docs/guia-hub.md`.
 2. Confirme `/health` respondendo 200.
 
-### Parte 2 — Cliente vs hub (engine fake)
+### Parte 2 — Cliente vs hub (uma máquina)
 1. `HUB_BASE_URL=http://<ip-do-hub>:3000 npm run dev`
-2. Na UI: registre um usuário, faça login, crie uma rede, publique um arquivo (dialog abre, selecione um PDF qualquer).
-3. Confirme: o hub recebeu a versão (`GET /networks/:id/versions` via curl).
-4. Em outro perfil (ou outra instância do app): peça acesso, aprove, baixe o arquivo.
+2. Na UI: registre um usuário, faça login, crie uma rede, publique um arquivo (o botão abre o dialog nativo, selecione um arquivo qualquer).
+3. Confirme: o hub recebeu a versão (`GET /networks/:id/versions` via curl) e o `infoHash` é um sha1 real de 40 chars.
 
-### Parte 3 — Cliente vs hub (engine real, P2P)
-1. `TORRENT_ENGINE=webtorrent HUB_BASE_URL=http://<ip>:3000 npm run dev`
-2. Máquina A publica → máquina B baixa → confirme a transferência P2P (peers aparecem na aba, download completa).
-3. Heartbeat aparece na aba Peers de cada um.
+### Parte 3 — Download P2P (duas máquinas)
+1. Máquina A publica um arquivo → vira seeder.
+2. Máquina B (`HUB_BASE_URL` apontando pro mesmo hub): pede acesso, é aprovada, baixa → confirme a transferência P2P e o arquivo no workspace.
+3. Heartbeat aparece na aba Peers de cada um (atualiza a cada 10s).
 
 ### Parte 4 — Teste com amigos
 1. Hub na AWS (EC2 com IP público).
@@ -116,12 +112,12 @@ Para mudar: `TORRENT_ENGINE=webtorrent npm run dev`.
 | Tela branca | Renderer não buildou; veja erros no terminal do forge |
 | Login falha / 401 | Hub não está no ar, ou `HUB_BASE_URL` errado |
 | Upload não faz nada | Dialog abriu mas nenhum arquivo selecionado; ou hub sem a rede criada |
-| Download não completa (webtorrent) | Nenhum peer com o conteúdo no swarm; verifique se o uploader ainda está semeando |
-| `Cannot find module 'electron'` no typecheck | Use `npm run typecheck` (aponta para tsconfig.node que exclui main/preload); o typecheck completo roda com Electron instalado (`tsc --noEmit`) |
-| Peers não aparecem | Heartbeat depende do main rodando `PresenceRuntime.start()`; confirme que a rota `/heartbeat` do hub está respondendo |
+| Download não completa | Nenhum peer com o conteúdo no swarm; verifique se o uploader ainda está semeando; rede pode estar bloqueando BitTorrent |
+| `Cannot find module 'electron'` no typecheck | `npm run typecheck` cobre só o core (`tsconfig.node.json`); o renderer/main só typechecam com as deps instaladas (`npm install`) |
+| Peers não aparecem | A aba Peers busca `GET /networks/:id/peers` a cada 10s; confirme que você bateu heartbeat (o main envia) e que o hub responde a rota |
 
 ---
 
-## 8. Nota sobre o que falta adaptar (imports do renderer)
+## 8. Arquitetura da fronteira renderer ↔ main
 
-Os arquivos de páginas/componentes migrados da `electron-ui/` ainda importam do `../api` (o arquivo antigo). Na primeira vez que rodar o `electron-forge start`, o Vite vai apontar os imports quebrados. Troque cada `import { ... } from '../api'` por `import { api } from '../ipc-client'` — as assinaturas são as mesmas (feitas para isso). O `useHeartbeat` foi removido; a aba Peers assinará `presence:update` (o main empurra). Esse é o ajuste final mecânico que o typecheck do renderer vai guiar.
+Todo acesso ao hub passa por **IPC**: o renderer chama `api.*` (`src/renderer/ipc-client.ts`) → `window.clientApi.invoke(canal)` (preload) → `registerIpcHandlers` (main) → use case do core (`electron-container.ts`) → `HubApi`. O renderer **nunca vê o JWT**: o processo main é o dono da sessão (persistida em `userData`). Se precisar adicionar um endpoint novo: exponha em `ipc-client.ts`, registre o canal em `ipc-map.ts`, e conecte o use case no `electron-container.ts`.
