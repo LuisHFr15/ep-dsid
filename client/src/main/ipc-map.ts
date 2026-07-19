@@ -17,7 +17,7 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
     "auth:login": async (input) => {
       const { user, password } = input as { user: string; password: string }
       const session = await container.login.execute({ user, password })
-      await container.initializeClient.execute()
+      try { await container.initializeClient.execute() } catch { /* non-fatal */ }
       return { userId: session.userId, username: session.user }
     },
     "auth:logout": async () => container.logout.execute(),
@@ -42,7 +42,7 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
         accessMode: data.accessMode,
         updateMode: data.updateMode,
       })
-      await container.initializeClient.execute()
+      try { await container.initializeClient.execute() } catch { /* non-fatal */ }
       return result
     },
     "networks:requestAccess": async (networkId) => {

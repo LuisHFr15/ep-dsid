@@ -25,9 +25,11 @@ export class WorkspaceError extends AppError {
 
 export class HubConnectionError extends AppError {
   readonly code = "HUB_CONNECTION_ERROR";
+  readonly status: number;
 
   constructor(method: string, path: string, status: number) {
     super(`Falha ao comunicar com o hub: ${method} ${path} retornou ${status}`);
+    this.status = status;
   }
 }
 

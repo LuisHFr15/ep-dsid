@@ -1,3 +1,4 @@
+import { HubConnectionError } from "../../domain/errors/app-error.js"
 import { SessionStore } from "../../domain/auth/session-store.js"
 import { ClientState } from "../../domain/client/client-state.js"
 import { ClientStateStore } from "../../domain/client/client-state-store.js"
@@ -160,12 +161,8 @@ export class InitializeClient {
 function isUnavailableNetworkContentError(
   error: unknown
 ): boolean {
-  if (!(error instanceof Error)) {
-    return false
-  }
-
   return (
-    error.message.includes("status 403") ||
-    error.message.includes("status 404")
+    error instanceof HubConnectionError &&
+    (error.status === 403 || error.status === 404)
   )
 }

@@ -1,3 +1,4 @@
+import { HubConnectionError } from "../../domain/errors/app-error.js"
 import { SessionStore } from "../../domain/auth/session-store.js"
 import { NetworkWorkspace } from "../../domain/client/client-home.js"
 import { ClientState } from "../../domain/client/client-state.js"
@@ -147,8 +148,5 @@ export function buildWorkspace(
 }
 
 function isNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    error.message.includes("status 404")
-  )
+  return error instanceof HubConnectionError && error.status === 404
 }
