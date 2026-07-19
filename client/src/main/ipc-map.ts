@@ -1,4 +1,5 @@
 import { ElectronContainer } from "./electron-container.js"
+import { isFilePathApproved } from "./approved-file-paths.js"
 
 type IpcHandler = (...args: unknown[]) => Promise<unknown>
 
@@ -75,8 +76,14 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
       })
     },
     "files:publishLocal": async (networkId, sourceFilePath) => {
+      const path = String(sourceFilePath)
+      // Só publica arquivos que o usuário aprovou via diálogo nativo — bloqueia
+      // um renderer comprometido de semear um caminho arbitrário do disco.
+      if (!isFilePathApproved(path)) {
+        throw new Error("Selecione o arquivo pelo botão antes de publicar.")
+      }
       await container.selectNetwork.execute({ networkRef: String(networkId) })
-      return container.publishLocalFile.execute({ sourceFilePath: String(sourceFilePath) })
+      return container.publishLocalFile.execute({ sourceFilePath: path })
     },
     "files:downloadCurrent": async (networkId) => {
       await container.selectNetwork.execute({ networkRef: String(networkId) })

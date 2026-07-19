@@ -49,3 +49,20 @@ export function sanitizeFolderSegment(value: string): string {
 
   return fallback
 }
+
+/*
+ * Reduz um nome de arquivo vindo de fonte não confiável (metadata do hub) a um
+ * único segmento seguro: descarta qualquer componente de diretório, remove
+ * sequências que sejam só pontos ("..", ".") e sanitiza os caracteres
+ * proibidos. Garante que o resultado nunca escape do diretório-alvo ao ser
+ * passado para path.join.
+ */
+export function sanitizeFilename(value: string): string {
+  const base = (value.split(/[\\/]/).pop() ?? "").replace(/^\.+$/, "")
+
+  if (base.trim().length === 0) {
+    return "arquivo"
+  }
+
+  return sanitizeFolderSegment(base)
+}

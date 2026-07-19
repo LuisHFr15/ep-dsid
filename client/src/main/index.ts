@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron"
+import { app, BrowserWindow, ipcMain, dialog, session } from "electron"
 // @ts-ignore
 import path from "node:path"
 import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
@@ -6,6 +6,7 @@ import { buildIpcMap } from "./ipc-map.js"
 import { registerIpcHandlers } from "./ipc.js"
 import { WebTorrentEngine } from "../infrastructure/torrent/webtorrent-engine.js"
 import { FileTorrentTransferStore } from "../infrastructure/torrent/file-torrent-transfer-store.js"
+import { approveFilePath } from "./approved-file-paths.js"
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
 declare const MAIN_WINDOW_VITE_NAME: string
@@ -67,8 +68,37 @@ async function startPresence(): Promise<void> {
   }
 }
 
+// Content-Security-Policy aplicada via header de resposta. Em produção é
+// estrita (o renderer não faz requisições de rede — tudo vai por IPC — então
+// nem precisa de connect-src externo). Em dev, o Vite/React Refresh exige
+// eval, inline e websocket para o HMR, então relaxamos apenas nesse caso.
+function applyContentSecurityPolicy(): void {
+  const isDev = Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+  const policy = isDev
+    ? "default-src 'self'; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data:; font-src 'self' data:; " +
+      "connect-src 'self' ws: http: https:"
+    : "default-src 'self'; " +
+      "script-src 'self'; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "img-src 'self' data:; font-src 'self' data:; " +
+      "connect-src 'self'"
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": [policy],
+      },
+    })
+  })
+}
+
 app.whenReady().then(() => {
   container = buildContainer()
+  applyContentSecurityPolicy()
   registerIpcHandlers(buildIpcMap(container))
 
   ipcMain.handle("dialog:openFile", async () => {
@@ -77,6 +107,8 @@ app.whenReady().then(() => {
       title: "Selecionar arquivo para compartilhar",
     })
     if (result.canceled || result.filePaths.length === 0) return null
+    // Só arquivos escolhidos aqui podem ser publicados (ver publishLocal).
+    approveFilePath(result.filePaths[0])
     return result.filePaths[0]
   })
 

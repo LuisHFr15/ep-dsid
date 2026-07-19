@@ -10,7 +10,7 @@ import {
   TorrentEngine,
   TorrentResource,
 } from "../../domain/torrent/torrent-engine.js"
-import { buildNetworkFolderName } from "../../domain/torrent/network-folder-name.js"
+import { buildNetworkFolderName, sanitizeFilename } from "../../domain/torrent/network-folder-name.js"
 import { TorrentTransfer } from "../../domain/torrent/torrent-transfer.js"
 import { TorrentTransferStore } from "../../domain/torrent/torrent-transfer-store.js"
 
@@ -79,7 +79,7 @@ export class WebTorrentEngine implements TorrentEngine {
     torrent.on("error", (err) => this.log(`torrent error (seed) ${input.networkId}`, err))
 
     const resource: TorrentResource = {
-      filename: input.sourceFilePath.split(/[\\/]/).pop() ?? "arquivo",
+      filename: sanitizeFilename(input.sourceFilePath),
       size: torrent.length,
       infoHash: torrent.infoHash,
       magnet: torrent.magnetURI,
@@ -119,9 +119,12 @@ export class WebTorrentEngine implements TorrentEngine {
       })
     })
 
-    const destinationPath = join(networkDirectory, input.filename)
+    // filename vem da metadata do hub (fonte não confiável) — sanitiza antes
+    // de compor o caminho para não escapar do diretório da rede.
+    const safeFilename = sanitizeFilename(input.filename)
+    const destinationPath = join(networkDirectory, safeFilename)
     const resource: TorrentResource = {
-      filename: input.filename,
+      filename: safeFilename,
       size: torrent.length,
       infoHash: torrent.infoHash,
       magnet: torrent.magnetURI,
@@ -134,7 +137,7 @@ export class WebTorrentEngine implements TorrentEngine {
       status: "completed",
       networkId: input.networkId,
       networkTitle: input.networkTitle,
-      filename: input.filename,
+      filename: safeFilename,
       infoHash: torrent.infoHash,
       magnet: torrent.magnetURI,
       sourcePath: input.sourceMagnet,

@@ -42,7 +42,10 @@ export async function writeJsonFile<T>(
   const content = `${JSON.stringify(value, null, 2)}\n`
 
   try {
-    await writeFile(temporaryPath, content, "utf8")
+    // 0600: só o dono lê/escreve. Estes arquivos guardam dados locais do
+    // usuário, incluindo o JWT da sessão — não devem ser legíveis por outros
+    // usuários da máquina.
+    await writeFile(temporaryPath, content, { encoding: "utf8", mode: 0o600 })
     await rename(temporaryPath, filePath)
   } catch (error) {
     await rm(temporaryPath, {
