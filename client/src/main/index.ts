@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron"
+// @ts-ignore
 import path from "node:path"
 import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
 import { buildIpcMap } from "./ipc-map.js"
