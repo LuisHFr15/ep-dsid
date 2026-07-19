@@ -6,6 +6,7 @@ import { LoginPage } from './pages/LoginPage'
 import { NetworksPage } from './pages/NetworksPage'
 import { NetworkDetailPage } from './pages/NetworkDetailPage'
 import { WorkspacePage } from './pages/WorkspacePage'
+import { TransfersPage } from './pages/TransfersPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { session } = useAuth()
@@ -51,6 +52,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Layout><WorkspacePage /></Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/transfers"
+        element={
+          <PrivateRoute>
+            <Layout><TransfersPage /></Layout>
           </PrivateRoute>
         }
       />
