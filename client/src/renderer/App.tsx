@@ -5,6 +5,7 @@ import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { NetworksPage } from './pages/NetworksPage'
 import { NetworkDetailPage } from './pages/NetworkDetailPage'
+import { WorkspacePage } from './pages/WorkspacePage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { session } = useAuth()
@@ -42,6 +43,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Layout><NetworkDetailPage /></Layout>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/workspace"
+        element={
+          <PrivateRoute>
+            <Layout><WorkspacePage /></Layout>
           </PrivateRoute>
         }
       />
