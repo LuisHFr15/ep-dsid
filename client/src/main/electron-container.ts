@@ -26,6 +26,7 @@ import { ConfigureWorkspace } from "../application/workspace/configure-workspace
 import { GetWorkspaceStatus } from "../application/workspace/get-workspace-status.js"
 import { RegisterLocalResource } from "../application/library/register-local-resource.js"
 import { DownloadCurrentFile } from "../application/torrent/download-current-file.js"
+import { ListTorrentTransfers } from "../application/torrent/list-torrent-transfers.js"
 import { PublishLocalFile } from "../application/torrent/publish-local-file.js"
 
 import { TorrentEngine } from "../domain/torrent/torrent-engine.js"
@@ -58,6 +59,7 @@ export type ElectronContainer = {
   getWorkspaceStatus: GetWorkspaceStatus
   publishLocalFile: PublishLocalFile
   downloadCurrentFile: DownloadCurrentFile
+  listTorrentTransfers: ListTorrentTransfers
   presenceRuntime: PresenceRuntime
 }
 
@@ -122,6 +124,7 @@ export function buildElectronContainer(
       torrentEngine,
       registerLocalResource,
     ),
+    listTorrentTransfers: new ListTorrentTransfers(torrentEngine),
     presenceRuntime: new PresenceRuntime(
       hubApi,
       sessionStore,

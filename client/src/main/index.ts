@@ -11,6 +11,7 @@ declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
 declare const MAIN_WINDOW_VITE_NAME: string
 
 let container: ElectronContainer
+let mainWindow: BrowserWindow | null = null
 
 function buildContainer(): ElectronContainer {
   const dataRoot = app.getPath("userData")
@@ -23,7 +24,7 @@ function buildContainer(): ElectronContainer {
 }
 
 function createWindow(): void {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
@@ -34,21 +35,80 @@ function createWindow(): void {
       nodeIntegration: false,
     },
     titleBarStyle: "hiddenInset",
-    backgroundColor: "#0d1117",
+    backgroundColor: "#0b0b0f",
   })
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    win.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
-    win.webContents.openDevTools()
+    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
+    mainWindow.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`))
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`))
+  }
+
+  mainWindow.on("closed", () => {
+    mainWindow = null
+  })
+}
+
+// Presença automática: inicia o runtime empurrando updates para o renderer.
+let presenceStarted = false
+async function startPresence(): Promise<void> {
+  if (presenceStarted) return
+  try {
+    await container.presenceRuntime.start({
+      onUpdate: (update) => {
+        mainWindow?.webContents.send("presence:update", update)
+      },
+    })
+    presenceStarted = true
+  } catch (err) {
+    // Sem sessão ainda: silencioso; o login dispara startPresence de novo.
+    void err
   }
 }
 
 app.whenReady().then(() => {
   container = buildContainer()
   registerIpcHandlers(buildIpcMap(container))
+
+  ipcMain.handle("dialog:openFile", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      title: "Selecionar arquivo para compartilhar",
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle("workspace:choose", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"],
+      title: "Escolher pasta de compartilhamento",
+    })
+    if (result.canceled || result.filePaths.length === 0) return { ok: false, error: { code: "CANCELLED", message: "Nenhuma pasta escolhida" } }
+    try {
+      const workspace = await container.configureWorkspace.execute({ rootDirectory: result.filePaths[0] })
+      return { ok: true, data: workspace }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { ok: false, error: { code: "WORKSPACE_ERROR", message } }
+    }
+  })
+
+  ipcMain.handle("presence:start", async () => {
+    await startPresence()
+    return { ok: true, data: null }
+  })
+
+  ipcMain.handle("presence:stop", async () => {
+    container.presenceRuntime.stop()
+    presenceStarted = false
+    return { ok: true, data: null }
+  })
+
   createWindow()
+  void startPresence() // boot: se já há sessão, entra online
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -58,11 +118,6 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit()
 })
 
-ipcMain.handle("dialog:openFile", async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ["openFile"],
-    title: "Selecionar arquivo para compartilhar",
-  })
-  if (result.canceled || result.filePaths.length === 0) return null
-  return result.filePaths[0]
+app.on("before-quit", () => {
+  container?.presenceRuntime.stop()
 })

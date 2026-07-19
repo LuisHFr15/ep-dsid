@@ -59,4 +59,41 @@ export const api = {
   downloadCurrent: (networkId: string) => invoke<unknown>("files:downloadCurrent", networkId),
 
   openFilePicker: () => invoke<string | null>("dialog:openFile"),
+
+  workspaceStatus: () => invoke<WorkspaceStatus>("workspace:status"),
+  chooseWorkspace: () => invoke<{ rootDirectory: string }>("workspace:choose"),
+
+  listTransfers: () => invoke<TransferView[]>("transfers:list"),
+
+  startPresence: () => invoke<null>("presence:start"),
+  stopPresence: () => invoke<null>("presence:stop"),
+}
+
+export type WorkspaceStatus = {
+  configured: boolean
+  rootDirectory: string | null
+  directoryExists: boolean
+}
+
+export type TransferView = {
+  id: string
+  direction: "upload" | "download"
+  status: string
+  filename: string
+  size: number
+  progress: number
+  destinationPath: string
+  networkTitle: string
+}
+
+export type PresenceUpdate = {
+  networkId: string
+  networkTitle: string
+  online: boolean
+  activePeers: number | null
+  error: string | null
+}
+
+export function onPresenceUpdate(handler: (update: PresenceUpdate) => void): void {
+  subscribe("presence:update", (payload) => handler(payload as PresenceUpdate))
 }

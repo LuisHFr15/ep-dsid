@@ -87,5 +87,7 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
       return container.configureWorkspace.execute({ rootDirectory: String(rootDirectory) })
     },
     "workspace:status": async () => container.getWorkspaceStatus.execute(),
+
+    "transfers:list": async () => container.listTorrentTransfers.execute(),
   }
 }
