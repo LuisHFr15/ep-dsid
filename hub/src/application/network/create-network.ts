@@ -10,6 +10,7 @@ import { NetworkRepository } from "../../domain/network/network-repository";
 
 export interface CreateNetworkInput {
   ownerId: string;
+  ownerUsername: string;
   title: string;
   description: string;
   tags?: string[];
@@ -34,7 +35,9 @@ export class CreateNetwork {
     });
 
     await this.networks.save(network);
-    await this.memberships.save(createMembership(network.id, input.ownerId, "approved"));
+    await this.memberships.save(
+      createMembership(network.id, input.ownerId, input.ownerUsername, "approved"),
+    );
 
     return network;
   }

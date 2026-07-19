@@ -16,6 +16,7 @@ interface MembershipItem {
   type: "MEMBERSHIP";
   networkId: string;
   userId: string;
+  username: string;
   status: MembershipStatus;
   requestedAt: string;
   decidedAt: string | null;
@@ -36,6 +37,7 @@ function toItem(m: Membership): MembershipItem {
     type: "MEMBERSHIP",
     networkId: m.networkId,
     userId: m.userId,
+    username: m.username,
     status: m.status,
     requestedAt: m.requestedAt,
     decidedAt: m.decidedAt,
@@ -46,6 +48,8 @@ function toMembership(item: MembershipItem): Membership {
   return {
     networkId: item.networkId,
     userId: item.userId,
+    // Memberships antigos (antes deste campo) não têm username.
+    username: item.username ?? "",
     status: item.status,
     requestedAt: item.requestedAt,
     decidedAt: item.decidedAt,

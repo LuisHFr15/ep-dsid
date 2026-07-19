@@ -26,7 +26,7 @@ async function setup() {
     updateMode: "collaborative",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const announce = new AnnounceFile(networks, versions, clock);
   const publish = new PublishVersion(networks, memberships, versions, clock);
   const getCurrent = new GetCurrentFile(networks, memberships, versions);
@@ -87,7 +87,7 @@ describe("AnnounceFile", () => {
 
   it("forbids a non-owner from announcing", async () => {
     const s = await setup();
-    await s.memberships.save(createMembership(s.network.id, "bob", "approved"));
+    await s.memberships.save(createMembership(s.network.id, "bob", "bob", "approved"));
     await expect(
       s.announce.execute({ networkId: s.network.id, ownerId: "bob", infoHash: "h", filename: "a" }),
     ).rejects.toBeInstanceOf(ForbiddenError);

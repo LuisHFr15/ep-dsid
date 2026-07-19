@@ -6,6 +6,7 @@ import { NetworkRepository } from "../../domain/network/network-repository";
 export interface RequestAccessInput {
   networkId: string;
   userId: string;
+  username: string;
 }
 
 export interface RequestAccessResult {
@@ -34,7 +35,9 @@ export class RequestAccess {
     }
 
     const status: MembershipStatus = network.accessMode === "public" ? "approved" : "pending";
-    await this.memberships.save(createMembership(input.networkId, input.userId, status));
+    await this.memberships.save(
+      createMembership(input.networkId, input.userId, input.username, status),
+    );
 
     return { status };
   }

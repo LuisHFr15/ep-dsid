@@ -30,6 +30,7 @@ export class NetworkController {
       const { title, description, tags, accessMode, updateMode } = res.locals.body;
       const network = await this.createNetworkUseCase.execute({
         ownerId: res.locals.user.id,
+        ownerUsername: res.locals.user.username,
         title,
         description,
         tags,
@@ -47,6 +48,7 @@ export class NetworkController {
       const result = await this.requestAccessUseCase.execute({
         networkId: String(req.params.networkId),
         userId: res.locals.user.id,
+        username: res.locals.user.username,
       });
       const status = result.status === "pending" ? 202 : 200;
       res.status(status).json(result);

@@ -28,7 +28,7 @@ async function setup() {
     updateMode: "collaborative",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const publish = new PublishVersion(networks, memberships, versions, clock);
   const time = { value: 1_000_000 };
   const evaluate = new EvaluateFallback(networks, versions, presence, queue, () => time.value);

@@ -9,6 +9,7 @@ export interface ListPendingRequestsInput {
 
 export interface PendingRequest {
   userId: string;
+  username: string;
   requestedAt: string;
 }
 
@@ -28,6 +29,10 @@ export class ListPendingRequests {
     }
 
     const pending = await this.memberships.listPending(input.networkId);
-    return pending.map((m) => ({ userId: m.userId, requestedAt: m.requestedAt }));
+    return pending.map((m) => ({
+      userId: m.userId,
+      username: m.username,
+      requestedAt: m.requestedAt,
+    }));
   }
 }

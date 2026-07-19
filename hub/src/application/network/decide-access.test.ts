@@ -19,7 +19,7 @@ async function setup() {
     updateMode: "centralized",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "bob", "pending"));
+  await memberships.save(createMembership(network.id, "bob", "bob", "pending"));
   const decideAccess = new DecideAccess(networks, memberships);
   return { network, memberships, decideAccess };
 }

@@ -25,7 +25,7 @@ async function setup(updateMode: UpdateMode = "collaborative") {
     updateMode,
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const publish = new PublishVersion(networks, memberships, versions, clock);
   const promote = new PromoteVersion(networks, memberships, versions, clock);
   return { networks, memberships, versions, network, publish, promote };
@@ -82,7 +82,7 @@ describe("PromoteVersion", () => {
 
   it("blocks a non-owner in centralized mode", async () => {
     const s = await setup("centralized");
-    await s.memberships.save(createMembership(s.network.id, "bob", "approved"));
+    await s.memberships.save(createMembership(s.network.id, "bob", "bob", "approved"));
     const { branchA } = await fork(s);
     await expect(
       s.promote.execute({ networkId: s.network.id, versionId: branchA.versionId, actorId: "bob" }),
@@ -91,7 +91,7 @@ describe("PromoteVersion", () => {
 
   it("allows an approved member in collaborative mode", async () => {
     const s = await setup("collaborative");
-    await s.memberships.save(createMembership(s.network.id, "bob", "approved"));
+    await s.memberships.save(createMembership(s.network.id, "bob", "bob", "approved"));
     const { branchA } = await fork(s);
     const result = await s.promote.execute({ networkId: s.network.id, versionId: branchA.versionId, actorId: "bob" });
     expect(result.versionId).toBeTruthy();

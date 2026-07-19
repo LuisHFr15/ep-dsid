@@ -17,6 +17,7 @@ describe("CreateNetwork", () => {
     const { createNetwork } = setup();
     const network = await createNetwork.execute({
       ownerId: "alice",
+      ownerUsername: "alice",
       title: "docs",
       description: "shared docs",
       accessMode: "private",
@@ -32,6 +33,7 @@ describe("CreateNetwork", () => {
     const { createNetwork, memberships } = setup();
     const network = await createNetwork.execute({
       ownerId: "alice",
+      ownerUsername: "alice",
       title: "docs",
       description: "",
       accessMode: "private",
@@ -46,6 +48,7 @@ describe("CreateNetwork", () => {
     const { createNetwork } = setup();
     const network = await createNetwork.execute({
       ownerId: "alice",
+      ownerUsername: "alice",
       title: "docs",
       description: "",
       tags: ["report", "2026"],
@@ -60,6 +63,7 @@ describe("CreateNetwork", () => {
     const { createNetwork } = setup();
     const network = await createNetwork.execute({
       ownerId: "alice",
+      ownerUsername: "alice",
       title: "docs",
       description: "",
       accessMode: "private",

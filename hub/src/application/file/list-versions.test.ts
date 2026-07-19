@@ -24,7 +24,7 @@ async function setup(updateMode: UpdateMode = "collaborative") {
     updateMode,
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const publish = new PublishVersion(networks, memberships, versions, clock);
   const listVersions = new ListVersions(networks, memberships, versions);
   return { networks, memberships, versions, network, publish, listVersions };

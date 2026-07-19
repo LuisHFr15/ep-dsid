@@ -24,7 +24,7 @@ async function setup(accessMode: AccessMode = "private") {
     updateMode: "collaborative",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const publish = new PublishVersion(networks, memberships, versions, clock);
   const getCurrent = new GetCurrentFile(networks, memberships, versions);
   return { networks, memberships, versions, network, publish, getCurrent };
@@ -52,7 +52,7 @@ describe("GetCurrentFile", () => {
   it("allows an approved member on a private network", async () => {
     const { publish, getCurrent, memberships, network } = await setup("private");
     await publish.execute({ networkId: network.id, authorId: "alice", infoHash: "h1", filename: "a" });
-    await memberships.save(createMembership(network.id, "bob", "approved"));
+    await memberships.save(createMembership(network.id, "bob", "bob", "approved"));
     const resolved = await getCurrent.execute({ networkId: network.id, requesterId: "bob" });
     expect(resolved.infoHash).toBe("h1");
   });

@@ -26,35 +26,35 @@ describe("RequestAccess", () => {
   it("throws NotFoundError for an unknown network", async () => {
     const { requestAccess } = await setup("private");
     await expect(
-      requestAccess.execute({ networkId: "nope", userId: "bob" }),
+      requestAccess.execute({ networkId: "nope", userId: "bob", username: "bob" }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("leaves a private request pending", async () => {
     const { requestAccess, network, memberships } = await setup("private");
-    const result = await requestAccess.execute({ networkId: network.id, userId: "bob" });
+    const result = await requestAccess.execute({ networkId: network.id, userId: "bob", username: "bob" });
     expect(result.status).toBe("pending");
     expect((await memberships.find(network.id, "bob"))?.status).toBe("pending");
   });
 
   it("auto-approves a public request", async () => {
     const { requestAccess, network, memberships } = await setup("public");
-    const result = await requestAccess.execute({ networkId: network.id, userId: "bob" });
+    const result = await requestAccess.execute({ networkId: network.id, userId: "bob", username: "bob" });
     expect(result.status).toBe("approved");
     expect((await memberships.find(network.id, "bob"))?.status).toBe("approved");
   });
 
   it("treats the owner as already approved without writing a membership", async () => {
     const { requestAccess, network, memberships } = await setup("private");
-    const result = await requestAccess.execute({ networkId: network.id, userId: "alice" });
+    const result = await requestAccess.execute({ networkId: network.id, userId: "alice", username: "alice" });
     expect(result.status).toBe("approved");
     expect(await memberships.find(network.id, "alice")).toBeNull();
   });
 
   it("is idempotent and returns the existing status", async () => {
     const { requestAccess, network } = await setup("private");
-    await requestAccess.execute({ networkId: network.id, userId: "bob" });
-    const again = await requestAccess.execute({ networkId: network.id, userId: "bob" });
+    await requestAccess.execute({ networkId: network.id, userId: "bob", username: "bob" });
+    const again = await requestAccess.execute({ networkId: network.id, userId: "bob", username: "bob" });
     expect(again.status).toBe("pending");
   });
 });

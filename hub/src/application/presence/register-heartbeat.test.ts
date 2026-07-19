@@ -21,7 +21,7 @@ async function setup(accessMode: AccessMode = "public") {
     updateMode: "collaborative",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const clock = { value: 1_000_000 };
   const now = () => clock.value;
   const heartbeat = new RegisterHeartbeat(networks, memberships, presence, now);

@@ -19,8 +19,8 @@ async function setup() {
     updateMode: "centralized",
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "bob", "pending"));
-  await memberships.save(createMembership(network.id, "carol", "approved"));
+  await memberships.save(createMembership(network.id, "bob", "bob", "pending"));
+  await memberships.save(createMembership(network.id, "carol", "carol", "approved"));
   const listPending = new ListPendingRequests(networks, memberships);
   return { network, listPending };
 }
@@ -30,6 +30,7 @@ describe("ListPendingRequests", () => {
     const { network, listPending } = await setup();
     const pending = await listPending.execute({ networkId: network.id, requesterId: "alice" });
     expect(pending.map((p) => p.userId)).toEqual(["bob"]);
+    expect(pending[0]).toMatchObject({ userId: "bob", username: "bob" });
   });
 
   it("forbids non-owners", async () => {

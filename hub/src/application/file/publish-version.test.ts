@@ -23,7 +23,7 @@ async function setup(updateMode: UpdateMode = "collaborative") {
     updateMode,
   });
   await networks.save(network);
-  await memberships.save(createMembership(network.id, "alice", "approved"));
+  await memberships.save(createMembership(network.id, "alice", "alice", "approved"));
   const publish = new PublishVersion(networks, memberships, versions, clock);
   return { networks, memberships, versions, network, publish };
 }
@@ -108,7 +108,7 @@ describe("PublishVersion", () => {
 
   it("blocks a non-owner in centralized mode", async () => {
     const { publish, memberships, network } = await setup("centralized");
-    await memberships.save(createMembership(network.id, "bob", "approved"));
+    await memberships.save(createMembership(network.id, "bob", "bob", "approved"));
     await expect(
       publish.execute({ networkId: network.id, authorId: "bob", infoHash: "h", filename: "a" }),
     ).rejects.toBeInstanceOf(ForbiddenError);
@@ -116,7 +116,7 @@ describe("PublishVersion", () => {
 
   it("allows an approved member in collaborative mode", async () => {
     const { publish, memberships, network } = await setup("collaborative");
-    await memberships.save(createMembership(network.id, "bob", "approved"));
+    await memberships.save(createMembership(network.id, "bob", "bob", "approved"));
     const result = await publish.execute({
       networkId: network.id,
       authorId: "bob",
