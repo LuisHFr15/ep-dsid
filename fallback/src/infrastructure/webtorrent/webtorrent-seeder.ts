@@ -20,6 +20,15 @@ interface WebTorrentClient {
 
 type WebTorrentCtor = new () => WebTorrentClient;
 
+// WebTorrent 2.x é ESM-only. Como este pacote compila para CommonJS, um
+// `import("webtorrent")` seria rebaixado pelo TypeScript para `require()`, que
+// falha em módulos ESM ("require() of ES Module ..."). Este helper esconde o
+// import() do compilador (via new Function) para que ele sobreviva como um
+// import() dinâmico nativo em runtime — a forma correta de carregar ESM de CJS.
+const dynamicImport = new Function("specifier", "return import(specifier)") as (
+  specifier: string,
+) => Promise<unknown>;
+
 async function hasLocalContent(path: string): Promise<boolean> {
   try {
     const entries = await readdir(path);
@@ -40,7 +49,7 @@ export class WebTorrentSeeder implements TorrentSeeder {
 
   private async getClient(): Promise<WebTorrentClient> {
     if (!this.client) {
-      const mod = (await import("webtorrent")) as unknown as { default: WebTorrentCtor };
+      const mod = (await dynamicImport("webtorrent")) as { default: WebTorrentCtor };
       const WebTorrent = mod.default;
       const client = new WebTorrent();
       // Um 'error' de client sem listener derruba o processo (Node). Nunca deixe solto.
