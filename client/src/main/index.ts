@@ -15,7 +15,7 @@ let mainWindow: BrowserWindow | null = null
 
 function buildContainer(): ElectronContainer {
   const dataRoot = app.getPath("userData")
-  const hubBaseUrl = process.env.HUB_BASE_URL ?? "http://localhost:3000"
+  const hubBaseUrl = process.env.HUB_BASE_URL ?? "http://52.90.156.108:3000"
   const torrentEngine = new WebTorrentEngine(
     new FileTorrentTransferStore(path.join(dataRoot, "transfers.json")),
     (message, err) => (err !== undefined ? console.error(message, err) : console.log(message)),
@@ -30,7 +30,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     webPreferences: {
-      preload: path.join(__dirname, "../preload/preload.js"),
+      preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -105,6 +105,14 @@ app.whenReady().then(() => {
     presenceStarted = false
     return { ok: true, data: null }
   })
+
+  // Auto-configura workspace no primeiro boot
+  container.getWorkspaceStatus.execute().then(async (status) => {
+    if (!status.configured) {
+      const defaultDir = path.join(app.getPath("documents"), "EP-DSID")
+      await container.configureWorkspace.execute({ rootDirectory: defaultDir })
+    }
+  }).catch(() => {})
 
   createWindow()
   void startPresence() // boot: se já há sessão, entra online
