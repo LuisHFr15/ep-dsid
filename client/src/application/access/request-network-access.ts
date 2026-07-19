@@ -1,8 +1,6 @@
 import { SessionStore } from "../../domain/auth/session-store.js"
-import { ClientStateStore } from "../../domain/client/client-state-store.js"
 import { RequestNetworkAccessResult } from "../../domain/access/network-access.js"
 import { HubApi } from "../../infrastructure/hub/hub-api.js"
-import { resolveNetworkRef } from "../client/select-network.js"
 
 export type RequestNetworkAccessInput = {
   networkRef: string
@@ -11,8 +9,7 @@ export type RequestNetworkAccessInput = {
 export class RequestNetworkAccess {
   constructor(
     private readonly hubApi: HubApi,
-    private readonly sessionStore: SessionStore,
-    private readonly clientStateStore: ClientStateStore
+    private readonly sessionStore: SessionStore
   ) {}
 
   async execute(
@@ -26,20 +23,9 @@ export class RequestNetworkAccess {
       )
     }
 
-    const state = await this.clientStateStore.load()
-
-    if (!state) {
-      throw new Error("Estado local não encontrado. Rode: client:init")
-    }
-
-    const network = resolveNetworkRef(
-      input.networkRef,
-      state.networks
-    )
-
-    return this.hubApi.requestNetworkAccess(
-      session.jwt,
-      network.id
-    )
+    // O networkRef já é o id vindo da UI. Não validamos contra o estado local
+    // (que pode estar desatualizado) — o hub é a fonte da verdade e valida o
+    // acesso. Isso permite pedir acesso a redes criadas após o login.
+    return this.hubApi.requestNetworkAccess(session.jwt, input.networkRef)
   }
 }

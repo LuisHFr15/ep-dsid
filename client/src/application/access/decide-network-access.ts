@@ -5,7 +5,6 @@ import {
 import { SessionStore } from "../../domain/auth/session-store.js"
 import { ClientStateStore } from "../../domain/client/client-state-store.js"
 import { HubApi } from "../../infrastructure/hub/hub-api.js"
-import { resolveNetworkRef } from "../client/select-network.js"
 
 export type DecideNetworkAccessInput = {
   requestRef: string
@@ -37,13 +36,13 @@ export class DecideNetworkAccess {
       throw new Error("Estado local não encontrado. Rode: client:init")
     }
 
-    const network = input.networkRef
-      ? resolveNetworkRef(input.networkRef, state.networks)
-      : resolveSelectedNetwork(state)
+    // networkRef já é o id vindo da UI; sem ref, cai na rede selecionada.
+    // Não validamos contra o snapshot local (pode estar desatualizado).
+    const networkId = input.networkRef ?? resolveSelectedNetworkId(state)
 
     const requests = await this.hubApi.listNetworkAccessRequests(
       session.jwt,
-      network.id
+      networkId
     )
 
     const userId = resolveRequestRef(
@@ -53,7 +52,7 @@ export class DecideNetworkAccess {
 
     return this.hubApi.decideNetworkAccess(
       session.jwt,
-      network.id,
+      networkId,
       {
         userId,
         decision: input.decision
@@ -89,27 +88,14 @@ function resolveRequestRef(
   )
 }
 
-function resolveSelectedNetwork(
-  state: {
-    selectedNetworkId: string | null
-    networks: Array<{ id: string; title: string }>
-  }
-): { id: string; title: string } {
+function resolveSelectedNetworkId(
+  state: { selectedNetworkId: string | null }
+): string {
   if (!state.selectedNetworkId) {
     throw new Error(
       "Nenhuma network selecionada. Informe uma rede ou use network:select."
     )
   }
 
-  const network = state.networks.find(
-    (item) => item.id === state.selectedNetworkId
-  )
-
-  if (!network) {
-    throw new Error(
-      "A network selecionada não existe mais. Rode: client:refresh"
-    )
-  }
-
-  return network
+  return state.selectedNetworkId
 }

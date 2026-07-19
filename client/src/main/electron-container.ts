@@ -104,7 +104,7 @@ export function buildElectronContainer(
     listVersions: new ListVersions(hubApi, sessionStore),
     promoteVersion: new PromoteVersion(hubApi, sessionStore),
     listActivePeers: new ListActivePeers(hubApi, sessionStore),
-    requestNetworkAccess: new RequestNetworkAccess(hubApi, sessionStore, clientStateStore),
+    requestNetworkAccess: new RequestNetworkAccess(hubApi, sessionStore),
     listNetworkAccessRequests: new ListNetworkAccessRequests(hubApi, sessionStore, clientStateStore),
     decideNetworkAccess: new DecideNetworkAccess(hubApi, sessionStore, clientStateStore),
     configureWorkspace: new ConfigureWorkspace(workspaceStore),
