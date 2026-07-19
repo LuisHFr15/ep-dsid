@@ -2,7 +2,7 @@ import type {
   Network,
   FileVersionsResult,
   ActivePeer,
-  NetworkAccessRequest,
+  AccessRequestsResult,
 } from "./types"
 
 declare global {
@@ -47,7 +47,7 @@ export const api = {
   listNetworks: () => invoke<Network[]>("networks:list"),
   createNetwork: (data: CreateNetworkData) => invoke<Network>("networks:create", data),
   requestAccess: (networkId: string) => invoke<unknown>("networks:requestAccess", networkId),
-  listAccessRequests: (networkId: string) => invoke<NetworkAccessRequest[]>("networks:listAccessRequests", networkId),
+  listAccessRequests: (networkId: string) => invoke<AccessRequestsResult>("networks:listAccessRequests", networkId),
   decideAccess: (networkId: string, userId: string, decision: "approve" | "reject") =>
     invoke<unknown>("networks:decideAccess", networkId, userId, decision),
   listPeers: (networkId: string) => invoke<{ activePeers: ActivePeer[] }>("networks:listPeers", networkId),

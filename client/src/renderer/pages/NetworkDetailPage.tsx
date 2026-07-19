@@ -61,16 +61,16 @@ export function NetworkDetailPage() {
 
   useEffect(() => {
     if (tab === 'acesso' && isOwner && id) {
-      api.listAccessRequests(id).then(setAccessRequests).catch(() => {})
+      api.listAccessRequests(id).then(r => setAccessRequests(r.requests)).catch(() => {})
     }
   }, [tab, isOwner, id])
 
   async function handleAnnounce() {
     if (!id) return
-    const filePath = await api.openFilePicker()
-    if (!filePath) return
     setBusy(true)
     try {
+      const filePath = await api.openFilePicker()
+      if (!filePath) return
       await api.publishLocal(id, filePath)
       toast('Arquivo publicado.', 'success')
       await load()
@@ -240,8 +240,8 @@ export function NetworkDetailPage() {
           <div className="flex flex-col gap-2">
             {accessRequests.map(r => (
               <div key={r.userId} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
-                <span className="font-medium">{r.username ?? r.userId}</span>
-                <span className="text-xs text-[var(--color-faint)]">{new Date(r.createdAt).toLocaleString('pt-BR')}</span>
+                <span className="font-medium">{r.username || r.userId}</span>
+                <span className="text-xs text-[var(--color-faint)]">{new Date(r.requestedAt).toLocaleString('pt-BR')}</span>
                 <div className="ml-auto flex gap-2">
                   <Button size="sm" onClick={() => handleDecide(r.userId, 'approve')}>Aprovar</Button>
                   <Button size="sm" variant="danger" onClick={() => handleDecide(r.userId, 'reject')}>Rejeitar</Button>

@@ -51,11 +51,16 @@ export interface HeartbeatResult {
 }
 
 export interface NetworkAccessRequest {
-  networkId: string
   userId: string
   username: string
-  status: MembershipStatus
-  createdAt: string
+  requestedAt: string
+  index?: number
+}
+
+export interface AccessRequestsResult {
+  networkId: string
+  networkTitle: string
+  requests: NetworkAccessRequest[]
 }
 
 export interface Session {

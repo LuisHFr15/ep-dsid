@@ -106,10 +106,12 @@ app.whenReady().then(() => {
       properties: ["openFile"],
       title: "Selecionar arquivo para compartilhar",
     })
-    if (result.canceled || result.filePaths.length === 0) return null
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: true, data: null }
+    }
     // Só arquivos escolhidos aqui podem ser publicados (ver publishLocal).
     approveFilePath(result.filePaths[0])
-    return result.filePaths[0]
+    return { ok: true, data: result.filePaths[0] }
   })
 
   ipcMain.handle("workspace:choose", async () => {
