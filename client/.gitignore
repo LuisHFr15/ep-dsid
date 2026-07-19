@@ -1,0 +1,14 @@
+# Dependências
+node_modules/
+
+# Saída de build do Electron Forge / Vite
+out/
+.vite/
+
+# Artefato solto do bundle do main (não deve ser versionado)
+main.js
+
+# Dados locais / ambiente
+.env
+.env.*
+!.env.example
