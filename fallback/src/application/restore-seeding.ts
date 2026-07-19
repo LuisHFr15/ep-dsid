@@ -17,7 +17,7 @@ export async function restoreSeeding(
       continue;
     }
     try {
-      await seeder.seed(entry.fileId, entry.infoHash);
+      await seeder.seed(entry.fileId, entry.infoHash, entry.magnet);
       restored++;
     } catch (err) {
       log(`failed to restore seeding for ${entry.fileId}`, err);

@@ -67,7 +67,7 @@ export class WebTorrentSeeder implements TorrentSeeder {
     return target;
   }
 
-  async seed(fileId: string, infoHash: string): Promise<void> {
+  async seed(fileId: string, infoHash: string, magnet?: string | null): Promise<void> {
     if (this.torrents.has(fileId)) {
       return;
     }
@@ -75,10 +75,12 @@ export class WebTorrentSeeder implements TorrentSeeder {
     const path = this.resolveSeedPath(fileId);
 
     // Semeia do EBS se ja temos o conteudo; senao busca da rede e persiste no path.
+    // Preferimos o magnet completo (traz os trackers do publicador) ao infoHash
+    // puro — sem trackers a descoberta de peers costuma falhar.
     // Ambos retornam o torrent imediatamente — nao bloqueamos esperando o download.
     const torrent = (await hasLocalContent(path))
       ? client.seed(path, { path })
-      : client.add(infoHash, { path });
+      : client.add(magnet ?? infoHash, { path });
 
     torrent.on("error", (err) => {
       this.log(`torrent error for ${fileId}`, err);

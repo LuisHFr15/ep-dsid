@@ -7,6 +7,10 @@ import { FallbackCommand } from "../domain/command";
 // segmento de path) ou a buscar conteúdo arbitrário (infoHash vira URL/arquivo).
 const uuid = z.string().uuid();
 const infoHash = z.string().regex(/^[a-f0-9]{40}$|^[a-f0-9]{64}$/i);
+// Magnet opcional: aceitamos apenas magnet URIs (usados para achar peers via
+// trackers). Qualquer outro valor é rejeitado para não virar URL/arquivo
+// arbitrário no client.add. Ausente/null é tolerado (cai no infoHash).
+const magnet = z.string().regex(/^magnet:\?/i).nullish();
 
 const schema = z.discriminatedUnion("cmd", [
   z.object({
@@ -14,6 +18,7 @@ const schema = z.discriminatedUnion("cmd", [
     networkId: uuid,
     fileId: uuid,
     infoHash,
+    magnet,
   }),
   z.object({
     cmd: z.literal("LEAVE"),

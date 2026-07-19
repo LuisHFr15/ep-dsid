@@ -18,6 +18,28 @@ describe("parseCommand", () => {
     expect(cmd).toEqual({ cmd: "LEAVE", networkId: NETWORK_ID, fileId: FILE_ID });
   });
 
+  it("accepts an optional magnet URI on JOIN", () => {
+    const magnet = `magnet:?xt=urn:btih:${INFO_HASH}&tr=udp://tracker.example:6969`;
+    const cmd = parseCommand(
+      JSON.stringify({ cmd: "JOIN", networkId: NETWORK_ID, fileId: FILE_ID, infoHash: INFO_HASH, magnet }),
+    );
+    expect(cmd).toMatchObject({ magnet });
+  });
+
+  it("rejects a magnet that is not a magnet URI", () => {
+    expect(() =>
+      parseCommand(
+        JSON.stringify({
+          cmd: "JOIN",
+          networkId: NETWORK_ID,
+          fileId: FILE_ID,
+          infoHash: INFO_HASH,
+          magnet: "http://evil.example/x.torrent",
+        }),
+      ),
+    ).toThrow(/invalid command/);
+  });
+
   it("accepts a 64-hex infoHash (btih v2)", () => {
     const hashV2 = "a".repeat(64);
     const cmd = parseCommand(

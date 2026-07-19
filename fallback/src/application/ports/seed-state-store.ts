@@ -2,6 +2,7 @@ export interface SeedEntry {
   networkId: string;
   fileId: string;
   infoHash: string;
+  magnet?: string | null;
 }
 
 export interface SeedStateStore {

@@ -26,8 +26,9 @@ export class ProcessCommand {
         networkId: command.networkId,
         fileId: command.fileId,
         infoHash: command.infoHash,
+        magnet: command.magnet,
       });
-      await this.seeder.seed(command.fileId, command.infoHash);
+      await this.seeder.seed(command.fileId, command.infoHash, command.magnet);
       this.log(
         `[fallback] JOIN concluído — agora semeando rede=${command.networkId} arquivo=${command.fileId}`,
       );

@@ -4,16 +4,16 @@ import { TorrentSeeder } from "../application/ports/torrent-seeder";
 
 export class FakeTorrentSeeder implements TorrentSeeder {
   readonly seeding = new Map<string, string>();
-  readonly seedCalls: Array<{ fileId: string; infoHash: string }> = [];
+  readonly seedCalls: Array<{ fileId: string; infoHash: string; magnet?: string | null }> = [];
   readonly dropCalls: string[] = [];
   failNextSeed = false;
 
-  async seed(fileId: string, infoHash: string): Promise<void> {
+  async seed(fileId: string, infoHash: string, magnet?: string | null): Promise<void> {
     if (this.failNextSeed) {
       this.failNextSeed = false;
       throw new Error("seed failed");
     }
-    this.seedCalls.push({ fileId, infoHash });
+    this.seedCalls.push({ fileId, infoHash, magnet });
     this.seeding.set(fileId, infoHash);
   }
 

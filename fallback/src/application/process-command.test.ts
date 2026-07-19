@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { ProcessCommand } from "./process-command";
 import { FakeSeedStateStore, FakeTorrentSeeder } from "../testing/fakes";
 
-function join(fileId = "f1", infoHash = "h1") {
-  return { cmd: "JOIN" as const, networkId: "n1", fileId, infoHash };
+function join(fileId = "f1", infoHash = "h1", magnet?: string | null) {
+  return { cmd: "JOIN" as const, networkId: "n1", fileId, infoHash, magnet };
 }
 
 function leave(fileId = "f1") {
@@ -22,8 +22,16 @@ describe("ProcessCommand", () => {
     const { state, seeder, process } = setup();
     await process.execute(join());
     expect(seeder.isSeeding("f1")).toBe(true);
-    expect(seeder.seedCalls).toEqual([{ fileId: "f1", infoHash: "h1" }]);
+    expect(seeder.seedCalls).toEqual([{ fileId: "f1", infoHash: "h1", magnet: undefined }]);
     expect((await state.list()).map((e) => e.fileId)).toEqual(["f1"]);
+  });
+
+  it("passa o magnet ao semear e o persiste no estado desejado", async () => {
+    const { state, seeder, process } = setup();
+    const magnet = "magnet:?xt=urn:btih:h1&tr=udp://tracker.example:6969";
+    await process.execute(join("f1", "h1", magnet));
+    expect(seeder.seedCalls).toEqual([{ fileId: "f1", infoHash: "h1", magnet }]);
+    expect((await state.list())[0].magnet).toBe(magnet);
   });
 
   it("is idempotent: a repeated JOIN does not seed twice", async () => {

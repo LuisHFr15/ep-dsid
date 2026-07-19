@@ -6,6 +6,9 @@ export interface JoinCommand {
   networkId: string;
   fileId: string;
   infoHash: string;
+  // Magnet completo (com trackers) quando o hub o tiver. Preferido sobre o
+  // infoHash puro para descoberta de peers ao baixar/semear.
+  magnet?: string | null;
 }
 
 export interface LeaveCommand {
