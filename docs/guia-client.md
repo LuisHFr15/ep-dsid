@@ -8,11 +8,11 @@ Este guia é para sua máquina pessoal (onde Electron e WebTorrent funcionam). C
 
 ## 1. Visão geral
 
-O cliente é um **app Electron** (§3.1): um **processo de UI** (React) que lida com navegação e uma **janela** ao hub, e um **subprocesso de torrent** (utility process) que hospeda o WebTorrent em background.
+O cliente é um **app Electron** (§3.1): um **processo de UI** (React + Tailwind) que lida com navegação e a comunicação com o hub, e o **WebTorrent** no processo main para semear/baixar em background.
 
-Toda a comunicação com o hub passa por **IPC** (renderer → main → use cases → HubApi). O renderer nunca faz HTTP direto. Sessão, estado e arquivos vivem em `userData`.
+Toda a comunicação com o hub passa por **IPC** (renderer → main → use cases → HubApi). O renderer nunca faz HTTP direto nem lida com JWT. Sessão, estado, workspace e transferências vivem em `userData`.
 
-A engine de torrent é **selecionável**: `TORRENT_ENGINE=fake` (copia arquivos locais, gera sha1 como infoHash — perfeito para demo/dev sem rede) ou `TORRENT_ENGINE=webtorrent` (o real). Por padrão usa `fake`.
+A UI (dark, Inter, Tailwind v4) tem: **Login/Registro**, **Redes** (grid + busca + criação), **Detalhe da rede** (abas Arquivo/Versões/Peers/Acesso), **Workspace** (pasta de compartilhamento) e **Transferências**. Feedback por **toasts** (sem `alert`). A **presença** entra automaticamente após o login (o main roda o `PresenceRuntime` e empurra `presence:update`).
 
 ---
 
@@ -36,7 +36,7 @@ client/
       ipc-map.ts           # mapa canal → use case
       electron-container.ts # composition root (userData, sessão única)
     preload/preload.ts     # contextBridge: invoke + on
-    renderer/              # React: pages, components, hooks, contexts, ipc-client, types, styles
+    renderer/              # React: pages/, components/ui/ (primitivos), contexts, ipc-client, styles/theme.css (Tailwind v4)
     testing/               # fakes para vitest
 ```
 
@@ -64,9 +64,11 @@ npm run dev                 # electron-forge start (abre a janela)
 
 Em dev o DevTools abre automaticamente. O hub precisa estar no ar (local ou remoto).
 
-**Sem Electron (só core + testes):**
+**Primeiro uso:** após logar, vá em **Workspace** (sidebar) e escolha uma pasta de compartilhamento — é onde os arquivos são semeados/baixados. Publicar sem workspace configurado dá erro; a página de Workspace resolve isso.
+
+**Verificação sem abrir a janela:**
 ```bash
-npm run typecheck           # tsc -p tsconfig.node.json --noEmit
+npm run typecheck           # tsc do core (tsconfig.node) + do renderer (tsconfig.json)
 npm test                    # vitest (core, sem Electron/React)
 ```
 
