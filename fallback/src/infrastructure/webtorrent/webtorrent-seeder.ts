@@ -1,5 +1,5 @@
 import { readdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { resolve, sep } from "node:path";
 import { TorrentSeeder } from "../../application/ports/torrent-seeder";
 
 // Tipagem minima local: WebTorrent 2.x e ESM-only e nao publica @types.
@@ -50,12 +50,29 @@ export class WebTorrentSeeder implements TorrentSeeder {
     return this.client;
   }
 
+  // Defesa em profundidade: o fileId já é validado como UUID em parse-command,
+  // mas resolvemos o caminho e confirmamos que continua dentro do seedDir antes
+  // de qualquer escrita/remoção. Um fileId com "../" ou vazio dispararia aqui.
+  private resolveSeedPath(fileId: string): string {
+    const root = resolve(this.seedDir);
+    const target = resolve(root, fileId);
+
+    if (target !== root && !target.startsWith(root + sep)) {
+      throw new Error(`fileId escapa do diretório de seed: ${fileId}`);
+    }
+    if (target === root) {
+      throw new Error(`fileId inválido (resolve para o próprio seedDir): ${fileId}`);
+    }
+
+    return target;
+  }
+
   async seed(fileId: string, infoHash: string): Promise<void> {
     if (this.torrents.has(fileId)) {
       return;
     }
     const client = await this.getClient();
-    const path = join(this.seedDir, fileId);
+    const path = this.resolveSeedPath(fileId);
 
     // Semeia do EBS se ja temos o conteudo; senao busca da rede e persiste no path.
     // Ambos retornam o torrent imediatamente — nao bloqueamos esperando o download.
@@ -72,12 +89,13 @@ export class WebTorrentSeeder implements TorrentSeeder {
   }
 
   async drop(fileId: string): Promise<void> {
+    const path = this.resolveSeedPath(fileId);
     const torrent = this.torrents.get(fileId);
     if (torrent) {
-      await new Promise<void>((resolve) => torrent.destroy(() => resolve()));
+      await new Promise<void>((done) => torrent.destroy(() => done()));
       this.torrents.delete(fileId);
     }
-    await rm(join(this.seedDir, fileId), { recursive: true, force: true });
+    await rm(path, { recursive: true, force: true });
   }
 
   isSeeding(fileId: string): boolean {
