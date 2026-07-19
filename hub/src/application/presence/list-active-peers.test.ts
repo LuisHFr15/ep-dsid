@@ -29,7 +29,9 @@ async function setup(accessMode: AccessMode = "public") {
 }
 
 async function beat(presence: InMemoryPeerPresenceStore, networkId: string, peerId: string, atMs: number) {
-  await presence.save(createPresence(networkId, peerId, `user-${peerId}`, new Date(atMs).toISOString()));
+  await presence.save(
+    createPresence(networkId, peerId, `user-${peerId}`, `nick-${peerId}`, new Date(atMs).toISOString()),
+  );
 }
 
 describe("ListActivePeers", () => {
@@ -39,7 +41,7 @@ describe("ListActivePeers", () => {
     await beat(presence, network.id, "peer-2", time.value);
 
     const result = await listPeers.execute({ networkId: network.id, requesterId: "alice" });
-    expect(result.activePeers.map((p) => p.peerId).sort()).toEqual(["peer-1", "peer-2"]);
+    expect(result.activePeers.map((p) => p.username).sort()).toEqual(["nick-peer-1", "nick-peer-2"]);
     expect(result.activePeers[0]).toHaveProperty("lastSeenAt");
   });
 
@@ -50,14 +52,16 @@ describe("ListActivePeers", () => {
     await beat(presence, network.id, "fresh", time.value);
 
     const result = await listPeers.execute({ networkId: network.id, requesterId: "alice" });
-    expect(result.activePeers.map((p) => p.peerId)).toEqual(["fresh"]);
+    expect(result.activePeers.map((p) => p.username)).toEqual(["nick-fresh"]);
   });
 
-  it("does not expose a user identifier", async () => {
+  it("exposes the nickname but not internal identifiers", async () => {
     const { listPeers, presence, network, time } = await setup();
     await beat(presence, network.id, "peer-1", time.value);
     const result = await listPeers.execute({ networkId: network.id, requesterId: "alice" });
+    expect(result.activePeers[0]).toHaveProperty("username", "nick-peer-1");
     expect(result.activePeers[0]).not.toHaveProperty("userId");
+    expect(result.activePeers[0]).not.toHaveProperty("peerId");
   });
 
   it("forbids a non-member on a private network", async () => {

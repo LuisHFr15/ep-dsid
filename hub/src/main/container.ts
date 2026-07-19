@@ -46,7 +46,7 @@ export function buildContainer(config: Config): AppContainer {
   const table = config.aws.dynamoTable;
 
   const commandQueue: CommandQueue = config.aws.sqsQueueUrl
-    ? new SqsCommandQueue(createSqsClient(config), config.aws.sqsQueueUrl)
+    ? new LoggingCommandQueue(new SqsCommandQueue(createSqsClient(config), config.aws.sqsQueueUrl))
     : new LoggingCommandQueue();
 
   const userRepository = new DynamoUserRepository(documentClient, table);

@@ -21,7 +21,7 @@ class RecordingDelegate implements PeerPresenceStore {
 }
 
 function presence(peerId: string, networkId = "n1"): PeerPresence {
-  return { networkId, peerId, userId: `u-${peerId}`, status: "online", lastSeenAt: "2026-01-01T00:00:00.000Z" };
+  return { networkId, peerId, userId: `u-${peerId}`, username: `nick-${peerId}`, status: "online", lastSeenAt: "2026-01-01T00:00:00.000Z" };
 }
 
 describe("CachingPeerPresenceStore", () => {

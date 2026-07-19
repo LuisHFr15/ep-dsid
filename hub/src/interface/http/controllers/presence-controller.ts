@@ -15,6 +15,7 @@ export class PresenceController {
         networkId,
         peerId,
         userId: res.locals.user.id,
+        username: res.locals.user.username,
       });
       res.json(result);
     } catch (err) {

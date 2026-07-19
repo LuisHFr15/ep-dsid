@@ -10,6 +10,7 @@ export interface RegisterHeartbeatInput {
   networkId: string;
   peerId: string;
   userId: string;
+  username: string;
 }
 
 export interface RegisterHeartbeatResult {
@@ -36,7 +37,9 @@ export class RegisterHeartbeat {
 
     const nowMs = this.now();
     const nowIso = new Date(nowMs).toISOString();
-    await this.presence.save(createPresence(input.networkId, input.peerId, input.userId, nowIso));
+    await this.presence.save(
+      createPresence(input.networkId, input.peerId, input.userId, input.username, nowIso),
+    );
 
     const peers = await this.presence.listByNetwork(input.networkId);
     const { active, expired } = partitionPresence(peers, nowMs);

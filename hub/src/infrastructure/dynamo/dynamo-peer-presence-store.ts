@@ -9,6 +9,7 @@ interface PeerItem {
   networkId: string;
   peerId: string;
   userId: string;
+  username: string;
   status: PresenceStatus;
   lastSeenAt: string;
 }
@@ -29,6 +30,7 @@ function toItem(presence: PeerPresence): PeerItem {
     networkId: presence.networkId,
     peerId: presence.peerId,
     userId: presence.userId,
+    username: presence.username,
     status: presence.status,
     lastSeenAt: presence.lastSeenAt,
   };
@@ -39,6 +41,9 @@ function toPresence(item: PeerItem): PeerPresence {
     networkId: item.networkId,
     peerId: item.peerId,
     userId: item.userId,
+    // Itens antigos (antes deste campo) não têm username; presença é efêmera
+    // e o próximo heartbeat regrava com o valor correto.
+    username: item.username ?? "",
     status: item.status,
     lastSeenAt: item.lastSeenAt,
   };

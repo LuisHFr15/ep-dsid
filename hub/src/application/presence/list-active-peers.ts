@@ -11,7 +11,7 @@ export interface ListActivePeersInput {
 }
 
 export interface ActivePeer {
-  peerId: string;
+  username: string;
   lastSeenAt: string;
 }
 
@@ -41,7 +41,7 @@ export class ListActivePeers {
 
     return {
       networkId: input.networkId,
-      activePeers: active.map((p) => ({ peerId: p.peerId, lastSeenAt: p.lastSeenAt })),
+      activePeers: active.map((p) => ({ username: p.username, lastSeenAt: p.lastSeenAt })),
     };
   }
 }

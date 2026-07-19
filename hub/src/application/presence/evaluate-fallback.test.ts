@@ -36,7 +36,9 @@ async function setup() {
 }
 
 async function beat(presence: InMemoryPeerPresenceStore, networkId: string, peerId: string, atMs: number) {
-  await presence.save(createPresence(networkId, peerId, `user-${peerId}`, new Date(atMs).toISOString()));
+  await presence.save(
+    createPresence(networkId, peerId, `user-${peerId}`, `nick-${peerId}`, new Date(atMs).toISOString()),
+  );
 }
 
 describe("EvaluateFallback", () => {

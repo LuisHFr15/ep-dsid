@@ -7,6 +7,7 @@ function presence(peerId: string, lastSeenMs: number, status: "online" | "offlin
     networkId: "n1",
     peerId,
     userId: "u1",
+    username: "nick",
     status,
     lastSeenAt: new Date(lastSeenMs).toISOString(),
   };

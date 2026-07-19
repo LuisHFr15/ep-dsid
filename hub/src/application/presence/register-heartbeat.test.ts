@@ -35,19 +35,21 @@ describe("RegisterHeartbeat", () => {
       networkId: network.id,
       peerId: "peer-1",
       userId: "alice",
+      username: "alice",
     });
     expect(result.activePeers).toBe(1);
   });
 
   it("marks a peer offline after 30s without a beat", async () => {
     const { heartbeat, network, clock } = await setup();
-    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice" });
+    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice", username: "alice" });
 
     clock.value += 31_000;
     const result = await heartbeat.execute({
       networkId: network.id,
       peerId: "peer-2",
       userId: "alice",
+      username: "alice",
     });
 
     expect(result.activePeers).toBe(1);
@@ -55,14 +57,15 @@ describe("RegisterHeartbeat", () => {
 
   it("keeps a peer active when it beats within the window", async () => {
     const { heartbeat, network, clock } = await setup();
-    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice" });
+    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice", username: "alice" });
 
     clock.value += 10_000;
-    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice" });
+    await heartbeat.execute({ networkId: network.id, peerId: "peer-1", userId: "alice", username: "alice" });
     const result = await heartbeat.execute({
       networkId: network.id,
       peerId: "peer-2",
       userId: "alice",
+      username: "alice",
     });
 
     expect(result.activePeers).toBe(2);
@@ -72,7 +75,7 @@ describe("RegisterHeartbeat", () => {
     const { heartbeat, network } = await setup();
     let result;
     for (const peerId of ["p1", "p2", "p3", "p4", "p5"]) {
-      result = await heartbeat.execute({ networkId: network.id, peerId, userId: "alice" });
+      result = await heartbeat.execute({ networkId: network.id, peerId, userId: "alice", username: "alice" });
     }
     expect(result?.activePeers).toBe(5);
   });
@@ -80,14 +83,14 @@ describe("RegisterHeartbeat", () => {
   it("forbids a non-member on a private network", async () => {
     const { heartbeat, network } = await setup("private");
     await expect(
-      heartbeat.execute({ networkId: network.id, peerId: "peer-x", userId: "bob" }),
+      heartbeat.execute({ networkId: network.id, peerId: "peer-x", userId: "bob", username: "bob" }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("fails for an unknown network", async () => {
     const { heartbeat } = await setup();
     await expect(
-      heartbeat.execute({ networkId: "nope", peerId: "peer-1", userId: "alice" }),
+      heartbeat.execute({ networkId: "nope", peerId: "peer-1", userId: "alice", username: "alice" }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
