@@ -31,7 +31,7 @@ export function buildContainer(config: Config): AppContainer {
   );
   const seeder = new WebTorrentSeeder(config.seedDir, log);
   const state = new FileSeedStateStore(config.seedDir, log);
-  const processCommand = new ProcessCommand(state, seeder);
+  const processCommand = new ProcessCommand(state, seeder, log);
   const worker = new Worker(consumer, processCommand, log);
 
   return { worker, seeder, state };
