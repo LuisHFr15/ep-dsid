@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron"
 import path from "node:path"
 import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
-import { FakeTorrentEngine } from "../infrastructure/torrent/fake-torrent-engine.js"
+import { WebTorrentEngine } from "../infrastructure/torrent/webtorrent-engine.js"
 import { FileTorrentTransferStore } from "../infrastructure/torrent/file-torrent-transfer-store.js"
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string
@@ -12,8 +12,9 @@ let container: ElectronContainer
 function buildContainer(): ElectronContainer {
   const dataRoot = app.getPath("userData")
   const hubBaseUrl = process.env.HUB_BASE_URL ?? "http://localhost:3000"
-  const torrentEngine = new FakeTorrentEngine(
+  const torrentEngine = new WebTorrentEngine(
     new FileTorrentTransferStore(path.join(dataRoot, "transfers.json")),
+    (message, err) => (err !== undefined ? console.error(message, err) : console.log(message)),
   )
   return buildElectronContainer(dataRoot, hubBaseUrl, torrentEngine)
 }
