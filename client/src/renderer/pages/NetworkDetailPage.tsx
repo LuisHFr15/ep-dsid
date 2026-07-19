@@ -217,11 +217,6 @@ export function NetworkDetailPage() {
 
       {tab === 'peers' && (
         <div className="flex flex-col gap-2">
-          {peers.length <= 4 && (
-            <div className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-sm text-[var(--color-warning)]">
-              ⚠ Poucos peers online (≤4) — o fallback do servidor tende a entrar.
-            </div>
-          )}
           {peers.length === 0 ? (
             <EmptyState title="Nenhum peer online" description="Ninguém está semeando esta rede no momento." />
           ) : (
