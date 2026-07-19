@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../ipc-client'
 import type { Network } from '../types'
+import { Button, Card, Input, Badge, Modal, EmptyState, useToast } from '../components/ui'
 
 export function NetworksPage() {
   const { session } = useAuth()
@@ -41,62 +42,71 @@ export function NetworksPage() {
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h1 className="page-title">Redes P2P</h1>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + Nova rede
-        </button>
+    <div>
+      <div className="mb-6 flex items-center justify-between pt-2">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Redes P2P</h1>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            Descubra, crie e participe de redes de compartilhamento.
+          </p>
+        </div>
+        <Button onClick={() => setShowCreate(true)}>+ Nova rede</Button>
       </div>
 
-      <form className="search-bar" onSubmit={handleSearch}>
-        <input
+      <form className="mb-6 flex gap-2" onSubmit={handleSearch}>
+        <Input
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Buscar por título ou tag…"
+          placeholder="Buscar por título, descrição ou tag…"
+          className="flex-1"
         />
-        <button type="submit" className="btn btn-ghost">Buscar</button>
+        <Button variant="subtle" type="submit">Buscar</Button>
         {query && (
-          <button type="button" className="btn btn-ghost" onClick={() => { setQuery(''); load() }}>
+          <Button variant="ghost" type="button" onClick={() => { setQuery(''); load() }}>
             Limpar
-          </button>
+          </Button>
         )}
       </form>
 
       {loading ? (
-        <div className="empty"><span className="spinner" /></div>
-      ) : networks.length === 0 ? (
-        <div className="empty">
-          <p>Nenhuma rede encontrada.</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]" />
+          ))}
         </div>
+      ) : networks.length === 0 ? (
+        <EmptyState
+          icon="🗂"
+          title={query ? 'Nenhuma rede encontrada' : 'Nenhuma rede ainda'}
+          description={query ? 'Tente outra busca.' : 'Crie a primeira rede para começar a compartilhar.'}
+          action={!query && <Button onClick={() => setShowCreate(true)}>+ Nova rede</Button>}
+        />
       ) : (
-        <div className="networks-grid">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {networks.map(n => (
-            <div
-              key={n.id}
-              className="network-card"
-              onClick={() => navigate(`/networks/${n.id}`)}
-            >
-              <div className="network-card-header">
-                <span className="network-card-title">{n.title}</span>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <span className={`badge badge-${n.accessMode}`}>
+            <Card key={n.id} interactive onClick={() => navigate(`/networks/${n.id}`)}>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <span className="font-semibold">{n.title}</span>
+                <div className="flex flex-shrink-0 gap-1">
+                  <Badge tone={n.accessMode === 'public' ? 'success' : 'neutral'}>
                     {n.accessMode === 'public' ? 'Pública' : 'Privada'}
-                  </span>
-                  {n.updateMode === 'collaborative' && (
-                    <span className="badge badge-collab">Colab</span>
-                  )}
+                  </Badge>
+                  {n.updateMode === 'collaborative' && <Badge tone="accent">Colab</Badge>}
                 </div>
               </div>
               {n.description && (
-                <p className="network-card-desc">{n.description}</p>
+                <p className="mb-3 line-clamp-2 text-sm text-[var(--color-muted)]">{n.description}</p>
               )}
               {n.tags.length > 0 && (
-                <div className="network-card-tags">
-                  {n.tags.map(t => <span key={t} className="tag">{t}</span>)}
+                <div className="flex flex-wrap gap-1">
+                  {n.tags.map(t => (
+                    <span key={t} className="rounded-md bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[11px] text-[var(--color-muted)]">
+                      {t}
+                    </span>
+                  ))}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -107,28 +117,21 @@ export function NetworksPage() {
           onCreated={() => { setShowCreate(false); load() }}
         />
       )}
-    </>
+    </div>
   )
 }
 
-function CreateNetworkModal({
-  onClose,
-  onCreated
-}: {
-  onClose: () => void
-  onCreated: () => void
-}) {
+function CreateNetworkModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { toast } = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
   const [accessMode, setAccessMode] = useState<'public' | 'private'>('public')
   const [updateMode, setUpdateMode] = useState<'centralized' | 'collaborative'>('centralized')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
     setLoading(true)
     try {
       await api.createNetwork({
@@ -138,66 +141,59 @@ function CreateNetworkModal({
         accessMode,
         updateMode
       })
+      toast('Rede criada.', 'success')
       onCreated()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar rede')
+      toast(err instanceof Error ? err.message : 'Erro ao criar rede', 'error')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal">
-        <h2>Nova rede P2P</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Título *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+    <Modal title="Nova rede P2P" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Input label="Título" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+        <Input label="Descrição" value={description} onChange={e => setDescription(e.target.value)} />
+        <Input label="Tags (separadas por vírgula)" value={tags} onChange={e => setTags(e.target.value)} placeholder="dados, projeto, turma" />
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-[var(--color-muted)]">Modo de acesso</span>
+          <div className="flex gap-2">
+            <SegButton active={accessMode === 'public'} onClick={() => setAccessMode('public')}>Pública</SegButton>
+            <SegButton active={accessMode === 'private'} onClick={() => setAccessMode('private')}>Privada</SegButton>
           </div>
-          <div className="form-group">
-            <label>Descrição</label>
-            <input value={description} onChange={e => setDescription(e.target.value)} />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-[var(--color-muted)]">Modo de atualização</span>
+          <div className="flex gap-2">
+            <SegButton active={updateMode === 'centralized'} onClick={() => setUpdateMode('centralized')}>Centralizado</SegButton>
+            <SegButton active={updateMode === 'collaborative'} onClick={() => setUpdateMode('collaborative')}>Colaborativo</SegButton>
           </div>
-          <div className="form-group">
-            <label>Tags (separadas por vírgula)</label>
-            <input value={tags} onChange={e => setTags(e.target.value)} placeholder="dados, projeto, turma" />
-          </div>
-          <div className="form-group">
-            <label>Modo de acesso</label>
-            <div className="radio-group">
-              <label className="radio-option">
-                <input type="radio" checked={accessMode === 'public'} onChange={() => setAccessMode('public')} />
-                Pública
-              </label>
-              <label className="radio-option">
-                <input type="radio" checked={accessMode === 'private'} onChange={() => setAccessMode('private')} />
-                Privada
-              </label>
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Modo de atualização</label>
-            <div className="radio-group">
-              <label className="radio-option">
-                <input type="radio" checked={updateMode === 'centralized'} onChange={() => setUpdateMode('centralized')} />
-                Centralizado (só admin publica)
-              </label>
-              <label className="radio-option">
-                <input type="radio" checked={updateMode === 'collaborative'} onChange={() => setUpdateMode('collaborative')} />
-                Colaborativo
-              </label>
-            </div>
-          </div>
-          {error && <p className="error-msg">{error}</p>}
-          <div className="modal-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <span className="spinner" /> : 'Criar rede'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div className="mt-2 flex justify-end gap-2">
+          <Button variant="ghost" type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" loading={loading}>Criar rede</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function SegButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`app-no-drag flex-1 rounded-lg border px-3 py-2 text-sm transition-colors ${
+        active
+          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-content)]'
+          : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-[var(--color-border-strong)]'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

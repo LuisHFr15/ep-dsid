@@ -5,6 +5,7 @@ import { useInterval } from '../hooks/useInterval'
 import { VersionTree } from '../components/VersionTree'
 import { api } from '../ipc-client'
 import type { Network, FileVersion, FileVersionsResult, NetworkAccessRequest, ActivePeer } from '../types'
+import { Button, Card, Badge, Tabs, Spinner, EmptyState, useToast, type TabItem } from '../components/ui'
 
 type Tab = 'arquivo' | 'versoes' | 'peers' | 'acesso'
 
@@ -12,6 +13,7 @@ export function NetworkDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { session } = useAuth()
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   const [network, setNetwork] = useState<Network | null>(null)
   const [currentFile, setCurrentFile] = useState<FileVersion | null>(null)
@@ -25,23 +27,20 @@ export function NetworkDetailPage() {
 
   const isOwner = session && network ? session.userId === network.ownerId : false
   const canContribute = isOwner || network?.updateMode === 'collaborative'
-  const fallbackLikely = peers.length <= 4
 
   const load = useCallback(async () => {
     if (!session || !id) return
     setLoading(true)
     setError('')
     try {
-      // O hub não tem GET /networks/:id direto; filtramos da listagem.
       const nets = await api.listNetworks()
       const found = nets.find(n => n.id === id)
       if (!found) { navigate('/networks'); return }
       setNetwork(found)
-
       if (found.activeFileId) {
         const [file, versions] = await Promise.all([
           api.getCurrentFile(id) as Promise<FileVersion>,
-          api.listVersions(id)
+          api.listVersions(id),
         ])
         setCurrentFile(file)
         setVersionsResult(versions)
@@ -55,7 +54,6 @@ export function NetworkDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  // Presença: enquanto a página está aberta, atualiza a lista de peers ativos.
   useInterval(() => {
     if (!id) return
     api.listPeers(id).then(r => setPeers(r.activePeers)).catch(() => {})
@@ -74,9 +72,10 @@ export function NetworkDetailPage() {
     setBusy(true)
     try {
       await api.publishLocal(id, filePath)
+      toast('Arquivo publicado.', 'success')
       await load()
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao anunciar arquivo')
+      toast(err instanceof Error ? err.message : 'Erro ao publicar', 'error')
     } finally {
       setBusy(false)
     }
@@ -87,9 +86,9 @@ export function NetworkDetailPage() {
     setBusy(true)
     try {
       await api.downloadCurrent(id)
-      alert('Download concluído no seu workspace.')
+      toast('Download concluído no seu workspace.', 'success')
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erro ao baixar arquivo')
+      toast(err instanceof Error ? err.message : 'Erro ao baixar', 'error')
     } finally {
       setBusy(false)
     }
@@ -99,9 +98,9 @@ export function NetworkDetailPage() {
     if (!id) return
     try {
       await api.requestAccess(id)
-      alert('Pedido enviado!')
+      toast('Pedido de acesso enviado.', 'success')
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erro')
+      toast(e instanceof Error ? e.message : 'Erro', 'error')
     }
   }
 
@@ -110,8 +109,9 @@ export function NetworkDetailPage() {
     try {
       await api.decideAccess(id, userId, decision)
       setAccessRequests(prev => prev.filter(r => r.userId !== userId))
+      toast(decision === 'approve' ? 'Acesso aprovado.' : 'Pedido rejeitado.', 'success')
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erro')
+      toast(e instanceof Error ? e.message : 'Erro', 'error')
     }
   }
 
@@ -119,131 +119,92 @@ export function NetworkDetailPage() {
     if (!id) return
     try {
       await api.promoteVersion(id, versionId)
+      toast('Versão promovida.', 'success')
       await load()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Erro ao promover versão')
+      toast(e instanceof Error ? e.message : 'Erro ao promover', 'error')
     }
   }
 
   if (loading) {
-    return <div className="empty"><span className="spinner" /></div>
+    return <div className="flex justify-center py-20"><Spinner size={24} /></div>
   }
   if (error) {
     return (
-      <div className="empty">
-        <p className="error-msg">{error}</p>
-        <button className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => navigate('/networks')}>
-          Voltar
-        </button>
-      </div>
+      <EmptyState
+        title="Não foi possível carregar"
+        description={error}
+        action={<Button variant="subtle" onClick={() => navigate('/networks')}>Voltar</Button>}
+      />
     )
   }
   if (!network) return null
 
+  const tabs: TabItem[] = [
+    { id: 'arquivo', label: 'Arquivo' },
+    { id: 'versoes', label: 'Versões' },
+    { id: 'peers', label: 'Peers' },
+    { id: 'acesso', label: 'Acesso', badge: isOwner ? accessRequests.length : 0 },
+  ]
+
   return (
-    <div className="network-detail">
-      <div className="page-header">
-        <div>
-          <button
-            className="btn btn-ghost btn-sm"
-            style={{ marginBottom: 8 }}
-            onClick={() => navigate('/networks')}
-          >
-            ← Redes
-          </button>
-          <h1 className="page-title">{network.title}</h1>
-          <div className="network-meta">
-            <span className={`badge badge-${network.accessMode}`}>
-              {network.accessMode === 'public' ? 'Pública' : 'Privada'}
-            </span>
-            {network.updateMode === 'collaborative' && (
-              <span className="badge badge-collab">Colaborativo</span>
+    <div>
+      <div className="pt-2 mb-4">
+        <button
+          className="app-no-drag mb-2 text-sm text-[var(--color-muted)] hover:text-[var(--color-content)]"
+          onClick={() => navigate('/networks')}
+        >
+          ← Redes
+        </button>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{network.title}</h1>
+            <div className="mt-2 flex items-center gap-2">
+              <Badge tone={network.accessMode === 'public' ? 'success' : 'neutral'}>
+                {network.accessMode === 'public' ? 'Pública' : 'Privada'}
+              </Badge>
+              {network.updateMode === 'collaborative' && <Badge tone="accent">Colaborativo</Badge>}
+              <span className="text-sm text-[var(--color-muted)]">
+                {peers.length} peer{peers.length !== 1 ? 's' : ''} online
+              </span>
+            </div>
+            {network.description && (
+              <p className="mt-2 text-sm text-[var(--color-muted)]">{network.description}</p>
             )}
-            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-              {peers.length} peer{peers.length !== 1 ? 's' : ''} online
-            </span>
           </div>
-          {network.description && (
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>
-              {network.description}
-            </p>
+          {!isOwner && network.accessMode === 'private' && (
+            <Button onClick={handleRequestAccess}>Pedir acesso</Button>
           )}
         </div>
-        {!isOwner && network.accessMode === 'private' && (
-          <button className="btn btn-primary" onClick={handleRequestAccess}>
-            Pedir acesso
-          </button>
-        )}
       </div>
 
-      <div className="tabs">
-        {(['arquivo', 'versoes', 'peers', 'acesso'] as Tab[]).map(t => (
-          <button
-            key={t}
-            className={`tab-btn${tab === t ? ' active' : ''}`}
-            onClick={() => setTab(t)}
-          >
-            {{ arquivo: 'Arquivo', versoes: 'Versões', peers: 'Peers', acesso: 'Acesso' }[t]}
-            {t === 'acesso' && isOwner && accessRequests.length > 0 && (
-              <span
-                style={{
-                  marginLeft: 6,
-                  background: 'var(--warning)',
-                  color: '#000',
-                  borderRadius: 20,
-                  padding: '0 6px',
-                  fontSize: 11
-                }}
-              >
-                {accessRequests.length}
-              </span>
-            )}
-          </button>
-        ))}
+      <div className="mb-5">
+        <Tabs items={tabs} active={tab} onChange={(t) => setTab(t as Tab)} />
       </div>
 
       {tab === 'arquivo' && (
-        <div>
-          {currentFile ? (
-            <div className="card">
-              <div style={{ marginBottom: 8, fontWeight: 600, fontSize: 16 }}>
-                {currentFile.filename}
-              </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <span>Tamanho: {formatBytes(currentFile.size)}</span>
-                <span>Lamport: #{currentFile.lamportTs}</span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                  infoHash: {currentFile.infoHash}
-                </span>
-                <span style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>
-                  magnet: {currentFile.magnet}
-                </span>
-              </div>
-              <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary" onClick={handleDownload} disabled={busy}>
-                  {busy ? <span className="spinner" /> : 'Baixar (P2P)'}
-                </button>
-                <button className="btn btn-ghost" onClick={load}>
-                  Atualizar
-                </button>
-              </div>
+        currentFile ? (
+          <Card>
+            <div className="mb-2 text-base font-semibold">{currentFile.filename}</div>
+            <div className="flex flex-col gap-1 text-sm text-[var(--color-muted)]">
+              <span>Tamanho: {formatBytes(currentFile.size)}</span>
+              <span>Lamport: #{currentFile.lamportTs}</span>
+              <span className="break-all font-mono text-[11px]">infoHash: {currentFile.infoHash}</span>
+              <span className="break-all font-mono text-[11px]">magnet: {currentFile.magnet}</span>
             </div>
-          ) : (
-            <div className="empty">
-              <p>Nenhum arquivo anunciado nesta rede ainda.</p>
-              {isOwner && (
-                <button
-                  className="btn btn-primary"
-                  style={{ marginTop: 16 }}
-                  onClick={handleAnnounce}
-                  disabled={busy}
-                >
-                  {busy ? <span className="spinner" /> : 'Selecionar arquivo'}
-                </button>
-              )}
+            <div className="mt-4 flex gap-2">
+              <Button onClick={handleDownload} loading={busy}>Baixar (P2P)</Button>
+              <Button variant="ghost" onClick={load}>Atualizar</Button>
             </div>
-          )}
-        </div>
+          </Card>
+        ) : (
+          <EmptyState
+            icon="📄"
+            title="Nenhum arquivo publicado"
+            description={isOwner ? 'Publique o primeiro arquivo desta rede.' : 'O admin ainda não publicou um arquivo.'}
+            action={isOwner && <Button onClick={handleAnnounce} loading={busy}>Selecionar arquivo</Button>}
+          />
+        )
       )}
 
       {tab === 'versoes' && (
@@ -255,64 +216,45 @@ export function NetworkDetailPage() {
       )}
 
       {tab === 'peers' && (
-        <div>
-          {fallbackLikely && (
-            <div className="fallback-notice">
-              ⚠ Poucos peers humanos online (≤4) — o fallback do servidor tende a entrar.
+        <div className="flex flex-col gap-2">
+          {peers.length <= 4 && (
+            <div className="rounded-lg border border-[var(--color-warning)]/30 bg-[var(--color-warning)]/10 px-3 py-2 text-sm text-[var(--color-warning)]">
+              ⚠ Poucos peers online (≤4) — o fallback do servidor tende a entrar.
             </div>
           )}
-          <div className="peers-list">
-            {peers.map(p => (
-              <div key={p.peerId} className="peer-item">
-                <div className="peer-dot" />
-                <span style={{ color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                  {p.peerId.slice(0, 8)}…
-                </span>
-                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                  {timeAgo(p.lastSeenAt)}
-                </span>
+          {peers.length === 0 ? (
+            <EmptyState title="Nenhum peer online" description="Ninguém está semeando esta rede no momento." />
+          ) : (
+            peers.map(p => (
+              <div key={p.peerId} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+                <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
+                <span className="font-mono text-xs text-[var(--color-muted)]">{p.peerId.slice(0, 8)}…</span>
+                <span className="ml-auto text-xs text-[var(--color-faint)]">{timeAgo(p.lastSeenAt)}</span>
               </div>
-            ))}
-            {peers.length === 0 && (
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 8 }}>
-                Nenhum peer online no momento.
-              </p>
-            )}
-          </div>
+            ))
+          )}
         </div>
       )}
 
       {tab === 'acesso' && (
-        <div>
-          {!isOwner ? (
-            <div className="empty"><p>Somente o admin da rede pode gerenciar acessos.</p></div>
-          ) : accessRequests.length === 0 ? (
-            <div className="empty"><p>Nenhum pedido de acesso pendente.</p></div>
-          ) : (
-            <div className="access-list">
-              {accessRequests.map(r => (
-                <div key={r.userId} className="access-item">
-                  <span className="access-item-user">{r.username ?? r.userId}</span>
-                  <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
-                    {new Date(r.createdAt).toLocaleString('pt-BR')}
-                  </span>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => handleDecide(r.userId, 'approve')}
-                  >
-                    Aprovar
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleDecide(r.userId, 'reject')}
-                  >
-                    Rejeitar
-                  </button>
+        !isOwner ? (
+          <EmptyState title="Sem permissão" description="Somente o admin da rede gerencia acessos." />
+        ) : accessRequests.length === 0 ? (
+          <EmptyState title="Nenhum pedido pendente" description="Novos pedidos de acesso aparecem aqui." />
+        ) : (
+          <div className="flex flex-col gap-2">
+            {accessRequests.map(r => (
+              <div key={r.userId} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+                <span className="font-medium">{r.username ?? r.userId}</span>
+                <span className="text-xs text-[var(--color-faint)]">{new Date(r.createdAt).toLocaleString('pt-BR')}</span>
+                <div className="ml-auto flex gap-2">
+                  <Button size="sm" onClick={() => handleDecide(r.userId, 'approve')}>Aprovar</Button>
+                  <Button size="sm" variant="danger" onClick={() => handleDecide(r.userId, 'reject')}>Rejeitar</Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   )
