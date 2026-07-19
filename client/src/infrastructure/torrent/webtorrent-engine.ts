@@ -105,15 +105,27 @@ export class WebTorrentEngine implements TorrentEngine {
 
     const torrent = await new Promise<Torrent>((resolvePromise, reject) => {
       let settled = false
+      const timeout = setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(
+          new Error(
+            "Nenhum peer disponível para baixar este arquivo. Verifique se alguém está online semeando.",
+          ),
+        )
+      }, 120000)
+
       client.add(input.sourceMagnet, { path: networkDirectory }, (added) => {
         added.on("done", () => {
           if (settled) return
           settled = true
+          clearTimeout(timeout)
           resolvePromise(added)
         })
         added.on("error", (err) => {
           if (settled) return
           settled = true
+          clearTimeout(timeout)
           reject(err instanceof Error ? err : new Error(String(err)))
         })
       })

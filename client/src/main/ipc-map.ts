@@ -83,11 +83,17 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
         throw new Error("Selecione o arquivo pelo botão antes de publicar.")
       }
       await container.selectNetwork.execute({ networkRef: String(networkId) })
-      return container.publishLocalFile.execute({ sourceFilePath: path })
+      const result = await container.publishLocalFile.execute({ sourceFilePath: path })
+      // Publicar entra na rede: passa a semear/marcar presença nela.
+      await container.setNetworkPresence.execute({ networkId: String(networkId), online: true })
+      return result
     },
     "files:downloadCurrent": async (networkId) => {
       await container.selectNetwork.execute({ networkRef: String(networkId) })
-      return container.downloadCurrentFile.execute({})
+      const result = await container.downloadCurrentFile.execute({})
+      // Baixar entra na rede: quem baixou tem o arquivo e passa a semear.
+      await container.setNetworkPresence.execute({ networkId: String(networkId), online: true })
+      return result
     },
 
     "workspace:configure": async (rootDirectory) => {
@@ -96,5 +102,17 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
     "workspace:status": async () => container.getWorkspaceStatus.execute(),
 
     "transfers:list": async () => container.listTorrentTransfers.execute(),
+
+    "presence:joinNetwork": async (networkId) => {
+      await container.setNetworkPresence.execute({ networkId: String(networkId), online: true })
+      return { online: true }
+    },
+    "presence:leaveNetwork": async (networkId) => {
+      await container.setNetworkPresence.execute({ networkId: String(networkId), online: false })
+      return { online: false }
+    },
+    "presence:getNetwork": async (networkId) => {
+      return container.getNetworkPresence.execute({ networkId: String(networkId) })
+    },
   }
 }

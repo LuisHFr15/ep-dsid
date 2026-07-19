@@ -59,6 +59,7 @@ export const api = {
   downloadCurrent: (networkId: string) => invoke<unknown>("files:downloadCurrent", networkId),
 
   openFilePicker: () => invoke<string | null>("dialog:openFile"),
+  copyToClipboard: (text: string) => invoke<null>("clipboard:write", text),
 
   workspaceStatus: () => invoke<WorkspaceStatus>("workspace:status"),
   chooseWorkspace: () => invoke<{ rootDirectory: string }>("workspace:choose"),
@@ -67,6 +68,9 @@ export const api = {
 
   startPresence: () => invoke<null>("presence:start"),
   stopPresence: () => invoke<null>("presence:stop"),
+  joinNetwork: (networkId: string) => invoke<{ online: boolean }>("presence:joinNetwork", networkId),
+  leaveNetwork: (networkId: string) => invoke<{ online: boolean }>("presence:leaveNetwork", networkId),
+  networkPresence: (networkId: string) => invoke<{ online: boolean }>("presence:getNetwork", networkId),
 }
 
 export type WorkspaceStatus = {

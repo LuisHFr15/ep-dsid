@@ -25,8 +25,12 @@ const INVOKE_CHANNELS = new Set<string>([
   "transfers:list",
   "dialog:openFile",
   "workspace:choose",
+  "clipboard:write",
   "presence:start",
   "presence:stop",
+  "presence:joinNetwork",
+  "presence:leaveNetwork",
+  "presence:getNetwork",
 ])
 
 const ON_CHANNELS = new Set<string>(["presence:update"])

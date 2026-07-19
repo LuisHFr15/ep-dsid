@@ -167,7 +167,8 @@ export class PresenceRuntime {
     }
 
     presence.networks[networkId] = {
-      online: true,
+      // Default offline: redes só recebem heartbeat depois que o usuário entra.
+      online: false,
       lastHeartbeatAt: null,
       lastActivePeers: null,
       lastError: null

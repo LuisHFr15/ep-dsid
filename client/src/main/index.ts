@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, session } from "electron"
+import { app, BrowserWindow, ipcMain, dialog, session, clipboard } from "electron"
 // @ts-ignore
 import path from "node:path"
 import { buildElectronContainer, ElectronContainer } from "./electron-container.js"
@@ -127,6 +127,11 @@ app.whenReady().then(() => {
       const message = err instanceof Error ? err.message : String(err)
       return { ok: false, error: { code: "WORKSPACE_ERROR", message } }
     }
+  })
+
+  ipcMain.handle("clipboard:write", async (_event, text: unknown) => {
+    clipboard.writeText(String(text ?? ""))
+    return { ok: true, data: null }
   })
 
   ipcMain.handle("presence:start", async () => {

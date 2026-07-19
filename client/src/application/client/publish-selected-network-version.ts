@@ -43,11 +43,17 @@ export class PublishSelectedNetworkVersion {
       )
     }
 
+    // O parentVersionRef normalmente já é o versionId do arquivo atual (vindo da
+    // UI). Só resolvemos contra o snapshot local quando for um índice/rótulo
+    // (uso legado de CLI); um id vai direto ao hub, que é a fonte da verdade.
+    // Isso evita falhar no 2º publish quando o snapshot local está desatualizado.
     const parentVersionId = input.parentVersionRef
-      ? resolveVersionRef(
-          input.parentVersionRef,
-          state.versionsByNetworkId[networkId]?.versions ?? []
-        )
+      ? isVersionId(input.parentVersionRef)
+        ? input.parentVersionRef
+        : resolveVersionRef(
+            input.parentVersionRef,
+            state.versionsByNetworkId[networkId]?.versions ?? []
+          )
       : undefined
 
     return this.hubApi.publishVersion(session.jwt, {
@@ -59,6 +65,13 @@ export class PublishSelectedNetworkVersion {
       parentVersionId
     })
   }
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isVersionId(ref: string): boolean {
+  return UUID_PATTERN.test(ref)
 }
 
 function resolveVersionRef(

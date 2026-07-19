@@ -39,7 +39,9 @@ export class InitializePresenceRuntime {
       const previousNetworkState = previousPresence?.networks[network.id]
 
       networks[network.id] = {
-        online: previousNetworkState?.online ?? true,
+        // Default offline: o usuário só semeia/marca presença numa rede após
+        // "entrar" (ou publicar/baixar). Preserva a escolha anterior se houver.
+        online: previousNetworkState?.online ?? false,
         lastHeartbeatAt: previousNetworkState?.lastHeartbeatAt ?? null,
         lastActivePeers: previousNetworkState?.lastActivePeers ?? null,
         lastError: previousNetworkState?.lastError ?? null

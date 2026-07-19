@@ -22,6 +22,8 @@ import { ListNetworks } from "../application/network/list-networks.js"
 import { ListActivePeers } from "../application/presence/list-active-peers.js"
 import { InitializePresenceRuntime } from "../application/presence-runtime/initialize-presence-runtime.js"
 import { PresenceRuntime } from "../application/presence-runtime/presence-runtime.js"
+import { SetNetworkPresence } from "../application/presence-runtime/set-network-presence.js"
+import { GetNetworkPresence } from "../application/presence-runtime/get-network-presence.js"
 import { ConfigureWorkspace } from "../application/workspace/configure-workspace.js"
 import { GetWorkspaceStatus } from "../application/workspace/get-workspace-status.js"
 import { RegisterLocalResource } from "../application/library/register-local-resource.js"
@@ -61,6 +63,8 @@ export type ElectronContainer = {
   downloadCurrentFile: DownloadCurrentFile
   listTorrentTransfers: ListTorrentTransfers
   presenceRuntime: PresenceRuntime
+  setNetworkPresence: SetNetworkPresence
+  getNetworkPresence: GetNetworkPresence
 }
 
 export function buildElectronContainer(
@@ -133,5 +137,7 @@ export function buildElectronContainer(
       initializeClient,
       initializePresenceRuntime,
     ),
+    setNetworkPresence: new SetNetworkPresence(presenceRuntimeStore, initializePresenceRuntime),
+    getNetworkPresence: new GetNetworkPresence(presenceRuntimeStore),
   }
 }

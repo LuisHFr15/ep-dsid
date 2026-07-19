@@ -1,45 +1,38 @@
-import { ClientStateStore } from "../../domain/client/client-state-store.js"
 import { PresenceRuntimeState } from "../../domain/presence-runtime/presence-runtime-state.js"
 import { PresenceRuntimeStore } from "../../domain/presence-runtime/presence-runtime-store.js"
 import { InitializePresenceRuntime } from "./initialize-presence-runtime.js"
-import { resolveNetworkRef } from "../client/select-network.js"
 
 export type SetNetworkPresenceInput = {
-  networkRef: string
+  networkId: string
   online: boolean
 }
 
 export class SetNetworkPresence {
   constructor(
-    private readonly clientStateStore: ClientStateStore,
     private readonly presenceRuntimeStore: PresenceRuntimeStore,
     private readonly initializePresenceRuntime: InitializePresenceRuntime
   ) {}
 
   async execute(input: SetNetworkPresenceInput): Promise<PresenceRuntimeState> {
-    const clientState = await this.clientStateStore.load()
-
-    if (!clientState) {
-      throw new Error("Estado local não encontrado. Rode: client:init")
-    }
-
     let presence = await this.presenceRuntimeStore.load()
 
     if (!presence) {
       presence = await this.initializePresenceRuntime.execute()
     }
 
-    const network = resolveNetworkRef(input.networkRef, clientState.networks)
+    // Usa o id direto (não valida contra o snapshot local, que pode estar
+    // desatualizado). Entrar/sair de uma rede é decisão do próprio cliente.
+    const existing = presence.networks[input.networkId]
 
-    if (!presence.networks[network.id]) {
-      presence.networks[network.id] = {
+    if (!existing) {
+      presence.networks[input.networkId] = {
         online: input.online,
         lastHeartbeatAt: null,
         lastActivePeers: null,
         lastError: null
       }
     } else {
-      presence.networks[network.id].online = input.online
+      existing.online = input.online
     }
 
     presence.updatedAt = new Date().toISOString()

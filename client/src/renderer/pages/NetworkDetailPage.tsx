@@ -20,6 +20,7 @@ export function NetworkDetailPage() {
   const [versionsResult, setVersionsResult] = useState<FileVersionsResult | null>(null)
   const [accessRequests, setAccessRequests] = useState<NetworkAccessRequest[]>([])
   const [peers, setPeers] = useState<ActivePeer[]>([])
+  const [joined, setJoined] = useState(false)
   const [tab, setTab] = useState<Tab>('arquivo')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -54,6 +55,11 @@ export function NetworkDetailPage() {
 
   useEffect(() => { load() }, [load])
 
+  useEffect(() => {
+    if (!id) return
+    api.networkPresence(id).then(p => setJoined(p.online)).catch(() => {})
+  }, [id])
+
   useInterval(() => {
     if (!id) return
     api.listPeers(id).then(r => setPeers(r.activePeers)).catch(() => {})
@@ -72,6 +78,7 @@ export function NetworkDetailPage() {
       const filePath = await api.openFilePicker()
       if (!filePath) return
       await api.publishLocal(id, filePath)
+      setJoined(true) // publicar entra na rede
       toast('Arquivo publicado.', 'success')
       await load()
     } catch (err) {
@@ -86,6 +93,7 @@ export function NetworkDetailPage() {
     setBusy(true)
     try {
       await api.downloadCurrent(id)
+      setJoined(true) // baixar entra na rede
       toast('Download concluído no seu workspace.', 'success')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao baixar', 'error')
@@ -123,6 +131,33 @@ export function NetworkDetailPage() {
       await load()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Erro ao promover', 'error')
+    }
+  }
+
+  async function handleCopyMagnet() {
+    if (!currentFile?.magnet) return
+    try {
+      await api.copyToClipboard(currentFile.magnet)
+      toast('Magnet copiado para a área de transferência.', 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Erro ao copiar', 'error')
+    }
+  }
+
+  async function handleToggleJoin() {
+    if (!id) return
+    try {
+      if (joined) {
+        await api.leaveNetwork(id)
+        setJoined(false)
+        toast('Você saiu da rede (parou de semear).', 'success')
+      } else {
+        await api.joinNetwork(id)
+        setJoined(true)
+        toast('Você entrou na rede (agora está semeando).', 'success')
+      }
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Erro', 'error')
     }
   }
 
@@ -172,9 +207,14 @@ export function NetworkDetailPage() {
               <p className="mt-2 text-sm text-[var(--color-muted)]">{network.description}</p>
             )}
           </div>
-          {!isOwner && network.accessMode === 'private' && (
-            <Button onClick={handleRequestAccess}>Pedir acesso</Button>
-          )}
+          <div className="flex items-center gap-2">
+            {!isOwner && network.accessMode === 'private' && (
+              <Button onClick={handleRequestAccess}>Pedir acesso</Button>
+            )}
+            <Button variant={joined ? 'subtle' : 'primary'} onClick={handleToggleJoin}>
+              {joined ? 'Sair' : 'Entrar'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -190,10 +230,15 @@ export function NetworkDetailPage() {
               <span>Tamanho: {formatBytes(currentFile.size)}</span>
               <span>Lamport: #{currentFile.lamportTs}</span>
               <span className="break-all font-mono text-[11px]">infoHash: {currentFile.infoHash}</span>
-              <span className="break-all font-mono text-[11px]">magnet: {currentFile.magnet}</span>
             </div>
-            <div className="mt-4 flex gap-2">
-              <Button onClick={handleDownload} loading={busy}>Baixar (P2P)</Button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button onClick={handleDownload} loading={busy}>Baixar</Button>
+              {currentFile.magnet && (
+                <Button variant="subtle" onClick={handleCopyMagnet}>Copiar magnet</Button>
+              )}
+              {canContribute && (
+                <Button variant="subtle" onClick={handleAnnounce} loading={busy}>Publicar nova versão</Button>
+              )}
               <Button variant="ghost" onClick={load}>Atualizar</Button>
             </div>
           </Card>
@@ -201,8 +246,8 @@ export function NetworkDetailPage() {
           <EmptyState
             icon="📄"
             title="Nenhum arquivo publicado"
-            description={isOwner ? 'Publique o primeiro arquivo desta rede.' : 'O admin ainda não publicou um arquivo.'}
-            action={isOwner && <Button onClick={handleAnnounce} loading={busy}>Selecionar arquivo</Button>}
+            description={canContribute ? 'Publique o primeiro arquivo desta rede.' : 'O admin ainda não publicou um arquivo.'}
+            action={canContribute && <Button onClick={handleAnnounce} loading={busy}>Selecionar arquivo</Button>}
           />
         )
       )}
@@ -255,7 +300,8 @@ export function NetworkDetailPage() {
   )
 }
 
-function formatBytes(bytes: number): string {
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes == null || !Number.isFinite(bytes)) return '—'
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`

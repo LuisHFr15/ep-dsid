@@ -76,7 +76,7 @@ export class DownloadCurrentFile {
 
     if (!currentFile.magnet) {
       throw new Error(
-        "O arquivo atual não possui uma origem fake no campo magnet."
+        "O arquivo atual não possui um magnet para download."
       )
     }
 
