@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(username: string, password: string) {
     const s = await api.login(username, password)
     setSession(s)
+    api.startPresence().catch(() => {}) // entra online após autenticar
   }
 
   async function register(username: string, password: string) {
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
+    await api.stopPresence().catch(() => {})
     await api.logout()
     setSession(null)
   }

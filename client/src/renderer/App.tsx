@@ -1,6 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ToastProvider } from './components/ui'
+import { ToastProvider, Spinner } from './components/ui'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { NetworksPage } from './pages/NetworksPage'
@@ -12,7 +12,17 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { session } = useAuth()
+  const { session, loading } = useAuth()
+
+  // Evita flicker de redirect enquanto a sessão é hidratada do main.
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Spinner size={28} />
+      </div>
+    )
+  }
+
   return (
     <Routes>
       <Route
