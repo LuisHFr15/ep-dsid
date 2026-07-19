@@ -220,10 +220,10 @@ export function NetworkDetailPage() {
           {peers.length === 0 ? (
             <EmptyState title="Nenhum peer online" description="Ninguém está semeando esta rede no momento." />
           ) : (
-            peers.map(p => (
-              <div key={p.peerId} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+            peers.map((p, i) => (
+              <div key={`${p.username}-${i}`} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
                 <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />
-                <span className="font-mono text-xs text-[var(--color-muted)]">{p.peerId.slice(0, 8)}…</span>
+                <span className="text-sm text-[var(--color-content)]">{p.username}</span>
                 <span className="ml-auto text-xs text-[var(--color-faint)]">{timeAgo(p.lastSeenAt)}</span>
               </div>
             ))

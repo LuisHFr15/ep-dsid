@@ -41,9 +41,7 @@ export interface FileVersionsResult {
 }
 
 export interface ActivePeer {
-  peerId: string
-  userId: string
-  status: string
+  username: string
   lastSeenAt: string
 }
 
