@@ -47,6 +47,7 @@ export class EvaluateFallback {
         networkId: network.id,
         fileId: current.fileId,
         infoHash: current.infoHash,
+        magnet: current.magnet,
       });
       this.fallbackActive.set(network.id, true);
     } else {

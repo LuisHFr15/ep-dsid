@@ -3,6 +3,7 @@ export interface JoinCommand {
   networkId: string;
   fileId: string;
   infoHash: string;
+  magnet: string | null;
 }
 
 export interface LeaveCommand {

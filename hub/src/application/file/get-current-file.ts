@@ -17,6 +17,7 @@ export interface ResolvedFile {
   infoHash: string;
   magnet: string | null;
   filename: string;
+  size: number | null;
   lamportTs: number;
 }
 
@@ -50,6 +51,7 @@ export class GetCurrentFile {
       infoHash: version.infoHash,
       magnet: version.magnet,
       filename: version.filename,
+      size: version.size,
       lamportTs: version.lamportTs,
     };
   }
