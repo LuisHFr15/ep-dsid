@@ -67,7 +67,7 @@ export function buildContainer(config: Config): AppContainer {
   const requestAccess = new RequestAccess(networkRepository, membershipRepository);
   const listPendingRequests = new ListPendingRequests(networkRepository, membershipRepository);
   const decideAccess = new DecideAccess(networkRepository, membershipRepository);
-  const listNetworks = new ListNetworks(networkRepository);
+  const listNetworks = new ListNetworks(networkRepository, membershipRepository);
   const publishVersion = new PublishVersion(
     networkRepository,
     membershipRepository,

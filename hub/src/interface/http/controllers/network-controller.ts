@@ -18,7 +18,11 @@ export class NetworkController {
     try {
       const q = typeof req.query.q === "string" ? req.query.q : undefined;
       const tag = typeof req.query.tag === "string" ? req.query.tag : undefined;
-      const networks = await this.listNetworksUseCase.execute({ q, tag });
+      const networks = await this.listNetworksUseCase.execute({
+        requesterId: res.locals.user.id,
+        q,
+        tag,
+      });
       res.json(networks);
     } catch (err) {
       next(err);
