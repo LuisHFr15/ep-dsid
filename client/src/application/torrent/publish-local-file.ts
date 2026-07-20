@@ -42,12 +42,6 @@ type PublishSelectedNetworkVersionPort = {
   }>
 }
 
-type PromoteSelectedNetworkVersionPort = {
-  execute(input: {
-    versionRef: string
-  }): Promise<unknown>
-}
-
 type RefreshNetworkWorkspacePort = {
   execute(): Promise<NetworkWorkspace>
 }
@@ -58,7 +52,6 @@ export class PublishLocalFile {
     private readonly getWorkspaceStatus: GetWorkspaceStatusPort,
     private readonly torrentEngine: TorrentEngine,
     private readonly publishSelectedNetworkVersion: PublishSelectedNetworkVersionPort,
-    private readonly promoteSelectedNetworkVersion: PromoteSelectedNetworkVersionPort,
     private readonly refreshNetworkWorkspace: RefreshNetworkWorkspacePort,
     private readonly registerLocalResource: RegisterLocalResource
   ) {}
@@ -109,11 +102,9 @@ export class PublishLocalFile {
             ?.versionId
       })
 
+    // A versão recém-publicada já é a atual (maior Lamport) — não promovemos.
+    // Promover aqui criava um segundo registro de versão a cada publish.
     await this.refreshNetworkWorkspace.execute()
-
-    await this.promoteSelectedNetworkVersion.execute({
-      versionRef: published.versionId
-    })
 
     await this.registerLocalResource.execute({
       networkId:

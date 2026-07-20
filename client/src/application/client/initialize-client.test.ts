@@ -60,4 +60,29 @@ describe("InitializeClient", () => {
     const state = await init.execute()
     expect(state.currentFilesByNetworkId["n1"]).toBeNull()
   })
+
+  it("does not abort the whole rebuild when one network errors (não-404)", async () => {
+    // Regressão: um erro não-404 (ex: 500) ao carregar UMA rede não pode
+    // impedir que o catálogo inteiro seja repovoado em state.networks.
+    const hub: Partial<HubApi> = {
+      listNetworks: async () => [
+        { id: "n1", title: "Docs", description: "", tags: [], ownerId: "u1", accessMode: "public", updateMode: "centralized", activeFileId: null, createdAt: "2026-01-01" },
+        { id: "n2", title: "Fotos", description: "", tags: [], ownerId: "u2", accessMode: "public", updateMode: "collaborative", activeFileId: null, createdAt: "2026-01-02" },
+      ],
+      getCurrentFile: async () => { throw new HubConnectionError("GET", "/networks/x/file", 500) },
+      listVersions: async () => { throw new HubConnectionError("GET", "/networks/x/versions", 500) },
+      listActivePeers: async () => { throw new HubConnectionError("GET", "/networks/x/peers", 500) },
+    }
+    const init = new InitializeClient(
+      hub as unknown as HubApi,
+      fakeSessionStore(),
+      fakeClientStateStore(),
+    )
+
+    const state = await init.execute()
+    // As duas redes continuam no snapshot, apesar do 500 por rede.
+    expect(state.networks.map((n) => n.id).sort()).toEqual(["n1", "n2"])
+    expect(state.currentFilesByNetworkId["n1"]).toBeNull()
+    expect(state.currentFilesByNetworkId["n2"]).toBeNull()
+  })
 })

@@ -10,7 +10,6 @@ import { RequestNetworkAccess } from "../application/access/request-network-acce
 import { GetCurrentNetwork } from "../application/client/get-current-network.js"
 import { InitializeClient } from "../application/client/initialize-client.js"
 import { SelectNetwork } from "../application/client/select-network.js"
-import { PromoteSelectedNetworkVersion } from "../application/client/promote-selected-network-version.js"
 import { PublishSelectedNetworkVersion } from "../application/client/publish-selected-network-version.js"
 import { RefreshNetworkWorkspace } from "../application/client/refresh-network-workspace.js"
 import { GetCurrentFile } from "../application/file/get-current-file.js"
@@ -85,7 +84,6 @@ export function buildElectronContainer(
   const getWorkspaceStatus = new GetWorkspaceStatus(workspaceStore)
   const refreshNetworkWorkspace = new RefreshNetworkWorkspace(hubApi, sessionStore, clientStateStore)
   const publishSelectedNetworkVersion = new PublishSelectedNetworkVersion(hubApi, sessionStore, clientStateStore)
-  const promoteSelectedNetworkVersion = new PromoteSelectedNetworkVersion(hubApi, sessionStore, clientStateStore)
   const registerLocalResource = new RegisterLocalResource(localLibraryStore)
   const initializePresenceRuntime = new InitializePresenceRuntime(
     sessionStore,
@@ -118,7 +116,6 @@ export function buildElectronContainer(
       getWorkspaceStatus,
       torrentEngine,
       publishSelectedNetworkVersion,
-      promoteSelectedNetworkVersion,
       refreshNetworkWorkspace,
       registerLocalResource,
     ),

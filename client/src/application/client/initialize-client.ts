@@ -1,4 +1,3 @@
-import { HubConnectionError } from "../../domain/errors/app-error.js"
 import { SessionStore } from "../../domain/auth/session-store.js"
 import { ClientState } from "../../domain/client/client-state.js"
 import { ClientStateStore } from "../../domain/client/client-state-store.js"
@@ -103,21 +102,19 @@ export class InitializeClient {
     return availableNetworkIds[0] ?? null
   }
 
+  // Estes helpers NUNCA propagam erro: um problema ao carregar o conteúdo de UMA
+  // rede (403/404 esperados, mas também 500/timeout/etc) não pode abortar o
+  // rebuild do catálogo inteiro — senão o snapshot local fica desatualizado e
+  // publicar/baixar numa rede recém-criada falha com "não está em estado local".
+  // Para a rede problemática, tratamos como "sem conteúdo" (null) e seguimos.
   private async safeGetCurrentFile(
     jwt: string,
     networkId: string
   ): Promise<NetworkFile | null> {
     try {
-      return await this.hubApi.getCurrentFile(
-        jwt,
-        networkId
-      )
-    } catch (error) {
-      if (isUnavailableNetworkContentError(error)) {
-        return null
-      }
-
-      throw error
+      return await this.hubApi.getCurrentFile(jwt, networkId)
+    } catch {
+      return null
     }
   }
 
@@ -126,16 +123,9 @@ export class InitializeClient {
     networkId: string
   ): Promise<FileVersionsResult | null> {
     try {
-      return await this.hubApi.listVersions(
-        jwt,
-        networkId
-      )
-    } catch (error) {
-      if (isUnavailableNetworkContentError(error)) {
-        return null
-      }
-
-      throw error
+      return await this.hubApi.listVersions(jwt, networkId)
+    } catch {
+      return null
     }
   }
 
@@ -144,25 +134,9 @@ export class InitializeClient {
     networkId: string
   ): Promise<ActivePeersResult | null> {
     try {
-      return await this.hubApi.listActivePeers(
-        jwt,
-        networkId
-      )
-    } catch (error) {
-      if (isUnavailableNetworkContentError(error)) {
-        return null
-      }
-
-      throw error
+      return await this.hubApi.listActivePeers(jwt, networkId)
+    } catch {
+      return null
     }
   }
-}
-
-function isUnavailableNetworkContentError(
-  error: unknown
-): boolean {
-  return (
-    error instanceof HubConnectionError &&
-    (error.status === 403 || error.status === 404)
-  )
 }
