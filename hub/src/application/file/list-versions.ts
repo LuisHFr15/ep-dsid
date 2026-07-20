@@ -14,6 +14,7 @@ export interface VersionNode {
   parentVersionId: string | null;
   infoHash: string;
   filename: string;
+  size: number | null;
   lamportTs: number;
   authorId: string;
   createdAt: string;
@@ -64,6 +65,7 @@ export class ListVersions {
         parentVersionId: v.parentVersionId,
         infoHash: v.infoHash,
         filename: v.filename,
+        size: v.size,
         lamportTs: v.lamportTs,
         authorId: v.authorId,
         createdAt: v.createdAt,

@@ -50,6 +50,14 @@ describe("ListVersions", () => {
     expect(dag.versions.find((n) => n.versionId === v2.versionId)?.isCurrent).toBe(true);
   });
 
+  it("includes the file size in each version node", async () => {
+    const { listVersions, publish, network } = await setup();
+    await publish.execute({ networkId: network.id, authorId: "alice", infoHash: "h1", filename: "a", size: 2048 });
+
+    const dag = await listVersions.execute({ networkId: network.id, requesterId: "alice" });
+    expect(dag.versions[0].size).toBe(2048);
+  });
+
   it("flags concurrent siblings that share a parent", async () => {
     const { listVersions, publish, network } = await setup();
     const base = await publish.execute({ networkId: network.id, authorId: "alice", infoHash: "h1", filename: "a" });
