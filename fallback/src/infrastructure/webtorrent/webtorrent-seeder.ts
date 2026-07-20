@@ -1,13 +1,19 @@
 import { readdir, rm } from "node:fs/promises";
 import { resolve, sep } from "node:path";
-import { TorrentSeeder } from "../../application/ports/torrent-seeder";
+import { SeedStatus, TorrentSeeder } from "../../application/ports/torrent-seeder";
 
 // Tipagem minima local: WebTorrent 2.x e ESM-only e nao publica @types.
 // Descrevemos apenas o que usamos, e carregamos o modulo via dynamic import
 // para nao quebrar o build CommonJS.
+type TorrentEvent = "ready" | "wire" | "download" | "done" | "noPeers" | "error";
+
 interface Torrent {
   infoHash: string;
-  on(event: "error", handler: (err: unknown) => void): void;
+  name?: string;
+  done: boolean;
+  progress: number;
+  numPeers: number;
+  on(event: TorrentEvent, handler: (arg?: unknown) => void): void;
   destroy(cb?: () => void): void;
 }
 
@@ -19,6 +25,12 @@ interface WebTorrentClient {
 }
 
 type WebTorrentCtor = new () => WebTorrentClient;
+
+interface SeedEntry {
+  torrent: Torrent;
+  done: boolean;
+  sawPeer: boolean;
+}
 
 // WebTorrent 2.x é ESM-only. Como este pacote compila para CommonJS, um
 // `import("webtorrent")` seria rebaixado pelo TypeScript para `require()`, que
@@ -40,7 +52,7 @@ async function hasLocalContent(path: string): Promise<boolean> {
 
 export class WebTorrentSeeder implements TorrentSeeder {
   private client: WebTorrentClient | null = null;
-  private readonly torrents = new Map<string, Torrent>();
+  private readonly torrents = new Map<string, SeedEntry>();
 
   constructor(
     private readonly seedDir: string,
@@ -87,23 +99,49 @@ export class WebTorrentSeeder implements TorrentSeeder {
     // Preferimos o magnet completo (traz os trackers do publicador) ao infoHash
     // puro — sem trackers a descoberta de peers costuma falhar.
     // Ambos retornam o torrent imediatamente — nao bloqueamos esperando o download.
-    const torrent = (await hasLocalContent(path))
+    const alreadyLocal = await hasLocalContent(path);
+    const torrent = alreadyLocal
       ? client.seed(path, { path })
       : client.add(magnet ?? infoHash, { path });
 
+    const entry: SeedEntry = { torrent, done: alreadyLocal, sawPeer: false };
+
+    // Observabilidade: o client.add baixa em background. Sem estes listeners nao
+    // ha como saber se o conteudo chegou de fato — o worker "semearia" um torrent
+    // vazio silenciosamente. Logamos as transicoes relevantes.
+    torrent.on("ready", () => {
+      this.log(
+        `[fallback] torrent pronto arquivo=${fileId} nome=${torrent.name ?? "?"} — buscando peers`,
+      );
+    });
+    torrent.on("wire", () => {
+      if (!entry.sawPeer) {
+        entry.sawPeer = true;
+        this.log(`[fallback] peer conectado para arquivo=${fileId} — baixando`);
+      }
+    });
+    torrent.on("done", () => {
+      entry.done = true;
+      this.log(`[fallback] download COMPLETO arquivo=${fileId} — agora semeando de verdade`);
+    });
+    torrent.on("noPeers", () => {
+      if (!entry.done && !entry.sawPeer) {
+        this.log(`[fallback] sem peers ainda para arquivo=${fileId} — aguardando o publicador`);
+      }
+    });
     torrent.on("error", (err) => {
       this.log(`torrent error for ${fileId}`, err);
       this.torrents.delete(fileId);
     });
 
-    this.torrents.set(fileId, torrent);
+    this.torrents.set(fileId, entry);
   }
 
   async drop(fileId: string): Promise<void> {
     const path = this.resolveSeedPath(fileId);
-    const torrent = this.torrents.get(fileId);
-    if (torrent) {
-      await new Promise<void>((done) => torrent.destroy(() => done()));
+    const entry = this.torrents.get(fileId);
+    if (entry) {
+      await new Promise<void>((done) => entry.torrent.destroy(() => done()));
       this.torrents.delete(fileId);
     }
     await rm(path, { recursive: true, force: true });
@@ -111,6 +149,16 @@ export class WebTorrentSeeder implements TorrentSeeder {
 
   isSeeding(fileId: string): boolean {
     return this.torrents.has(fileId);
+  }
+
+  listStatus(): SeedStatus[] {
+    return [...this.torrents.entries()].map(([fileId, entry]) => ({
+      fileId,
+      name: entry.torrent.name ?? null,
+      progress: entry.torrent.progress ?? 0,
+      numPeers: entry.torrent.numPeers ?? 0,
+      done: entry.done || entry.torrent.done === true,
+    }));
   }
 
   async close(): Promise<void> {

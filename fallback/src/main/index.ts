@@ -44,7 +44,17 @@ async function loop() {
 async function reportLiveness() {
   try {
     const entries = await container.state.list();
-    console.log(`alive: responsible for ${entries.length} file(s)`);
+    const status = container.seeder.listStatus();
+    const complete = status.filter((s) => s.done).length;
+    console.log(
+      `alive: responsavel por ${entries.length} arquivo(s) — ${complete} completo(s), ${status.length - complete} baixando`,
+    );
+    for (const s of status) {
+      const pct = Math.round(s.progress * 100);
+      console.log(
+        `  arquivo=${s.fileId} nome=${s.name ?? "?"} peers=${s.numPeers} progresso=${pct}% ${s.done ? "(completo)" : "(baixando)"}`,
+      );
+    }
   } catch (err) {
     log("liveness check failed", err);
   }

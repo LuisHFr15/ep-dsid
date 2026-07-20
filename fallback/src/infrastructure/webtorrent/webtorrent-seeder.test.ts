@@ -21,4 +21,10 @@ describe("WebTorrentSeeder containment", () => {
     const seeder = new WebTorrentSeeder(seedDir);
     await expect(seeder.drop("/etc/passwd")).rejects.toThrow(/escapa do diretório de seed/);
   });
+
+  it("listStatus is empty before anything is seeded", () => {
+    const seeder = new WebTorrentSeeder(seedDir);
+    expect(seeder.listStatus()).toEqual([]);
+    expect(seeder.isSeeding("qualquer")).toBe(false);
+  });
 });

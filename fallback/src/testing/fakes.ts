@@ -1,6 +1,6 @@
 import { CommandConsumer, RawMessage } from "../application/ports/command-consumer";
 import { SeedEntry, SeedStateStore } from "../application/ports/seed-state-store";
-import { TorrentSeeder } from "../application/ports/torrent-seeder";
+import { SeedStatus, TorrentSeeder } from "../application/ports/torrent-seeder";
 
 export class FakeTorrentSeeder implements TorrentSeeder {
   readonly seeding = new Map<string, string>();
@@ -24,6 +24,16 @@ export class FakeTorrentSeeder implements TorrentSeeder {
 
   isSeeding(fileId: string): boolean {
     return this.seeding.has(fileId);
+  }
+
+  listStatus(): SeedStatus[] {
+    return [...this.seeding.keys()].map((fileId) => ({
+      fileId,
+      name: null,
+      progress: 0,
+      numPeers: 0,
+      done: false,
+    }));
   }
 }
 
