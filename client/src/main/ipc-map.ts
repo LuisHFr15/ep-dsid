@@ -82,6 +82,10 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
       if (!isFilePathApproved(path)) {
         throw new Error("Selecione o arquivo pelo botão antes de publicar.")
       }
+      // Repovoa o snapshot local de redes antes de selecionar — a rede pode ter
+      // sido criada/aprovada após o login e não estar no cache (KL-014).
+      // Best-effort: se falhar, segue com o cache atual.
+      try { await container.initializeClient.execute() } catch { /* segue com o cache */ }
       await container.selectNetwork.execute({ networkRef: String(networkId) })
       const result = await container.publishLocalFile.execute({ sourceFilePath: path })
       // Publicar entra na rede: passa a semear/marcar presença nela.
@@ -89,6 +93,8 @@ export function buildIpcMap(container: ElectronContainer): Record<string, IpcHan
       return result
     },
     "files:downloadCurrent": async (networkId) => {
+      // Repovoa o snapshot local de redes antes de selecionar (ver publishLocal).
+      try { await container.initializeClient.execute() } catch { /* segue com o cache */ }
       await container.selectNetwork.execute({ networkRef: String(networkId) })
       const result = await container.downloadCurrentFile.execute({})
       // Baixar entra na rede: quem baixou tem o arquivo e passa a semear.
