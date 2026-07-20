@@ -29,7 +29,7 @@ export function Tabs({
           >
             {item.label}
             {item.badge !== undefined && item.badge > 0 && (
-              <span className="rounded-full bg-[var(--color-warning)] px-1.5 text-[10px] font-semibold text-black">
+              <span className="inline-flex min-w-[16px] items-center justify-center rounded-full bg-[var(--color-danger)] px-1 text-[10px] font-semibold leading-none text-white" style={{ height: 16 }}>
                 {item.badge}
               </span>
             )}

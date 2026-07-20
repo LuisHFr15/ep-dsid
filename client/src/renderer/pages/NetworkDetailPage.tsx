@@ -54,6 +54,24 @@ export function NetworkDetailPage() {
     }
   }, [session, id, navigate])
 
+  const refreshAccessRequests = useCallback(async () => {
+    if (!id || !isOwner) return
+    try {
+      const r = await api.listAccessRequests(id)
+      setAccessRequests(r.requests)
+    } catch { /* silencioso — badge só não atualiza */ }
+  }, [id, isOwner])
+
+  // Atualiza a rede a partir do catálogo (traz o membershipStatus mais recente).
+  const refreshNetwork = useCallback(async () => {
+    if (!id) return
+    try {
+      const nets = await api.listNetworks()
+      const found = nets.find(n => n.id === id)
+      if (found) setNetwork(found)
+    } catch { /* silencioso */ }
+  }, [id])
+
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
@@ -61,16 +79,21 @@ export function NetworkDetailPage() {
     api.networkPresence(id).then(p => setJoined(p.online)).catch(() => {})
   }, [id])
 
+  // Carrega os pedidos pendentes assim que sabemos que é owner (para a bolinha
+  // aparecer sem precisar abrir a aba).
+  useEffect(() => { void refreshAccessRequests() }, [refreshAccessRequests])
+
   useInterval(() => {
     if (!id) return
     api.listPeers(id).then(r => setPeers(r.activePeers)).catch(() => {})
   }, 10000)
 
-  useEffect(() => {
-    if (tab === 'acesso' && isOwner && id) {
-      api.listAccessRequests(id).then(r => setAccessRequests(r.requests)).catch(() => {})
-    }
-  }, [tab, isOwner, id])
+  // Polling leve: reflete aprovação de acesso (para o solicitante) e novos
+  // pedidos pendentes (para o owner) sem re-navegar.
+  useInterval(() => {
+    void refreshNetwork()
+    void refreshAccessRequests()
+  }, 15000)
 
   async function handleAnnounce() {
     if (!id) return
@@ -108,6 +131,7 @@ export function NetworkDetailPage() {
     try {
       await api.requestAccess(id)
       toast('Pedido de acesso enviado.', 'success')
+      await load() // reflete o novo status (pending/approved) na hora
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Erro', 'error')
     }
@@ -119,6 +143,7 @@ export function NetworkDetailPage() {
       await api.decideAccess(id, userId, decision)
       setAccessRequests(prev => prev.filter(r => r.userId !== userId))
       toast(decision === 'approve' ? 'Acesso aprovado.' : 'Pedido rejeitado.', 'success')
+      await refreshAccessRequests()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Erro', 'error')
     }
@@ -219,7 +244,11 @@ export function NetworkDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             {!isOwner && network.accessMode === 'private' && (
-              <Button onClick={handleRequestAccess}>Pedir acesso</Button>
+              network.membershipStatus === 'pending' ? (
+                <Badge tone="warning">Acesso pendente</Badge>
+              ) : (network.membershipStatus === 'approved' ? null : (
+                <Button onClick={handleRequestAccess}>Pedir acesso</Button>
+              ))
             )}
             <Button variant={joined ? 'subtle' : 'primary'} onClick={handleToggleJoin}>
               {joined ? 'Sair' : 'Entrar'}

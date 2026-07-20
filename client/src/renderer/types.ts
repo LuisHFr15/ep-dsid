@@ -3,6 +3,7 @@
 export type AccessMode = 'public' | 'private'
 export type UpdateMode = 'centralized' | 'collaborative'
 export type MembershipStatus = 'pending' | 'approved' | 'rejected'
+export type NetworkMembershipStatus = 'owner' | 'approved' | 'pending' | 'rejected' | 'none'
 
 export interface Network {
   id: string
@@ -14,6 +15,7 @@ export interface Network {
   ownerId: string
   activeFileId?: string
   createdAt: string
+  membershipStatus?: NetworkMembershipStatus
 }
 
 export interface FileVersion {
