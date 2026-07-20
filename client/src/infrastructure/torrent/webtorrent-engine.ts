@@ -21,6 +21,7 @@ interface Torrent {
   magnetURI: string
   length: number
   progress: number
+  done: boolean
   on(event: "done" | "error", handler: (err?: unknown) => void): void
 }
 
@@ -100,41 +101,86 @@ export class WebTorrentEngine implements TorrentEngine {
     )
     await mkdir(networkDirectory, { recursive: true })
 
-    const transferId = randomUUID()
-    const startedAt = new Date().toISOString()
-
-    const torrent = await new Promise<Torrent>((resolvePromise, reject) => {
-      let settled = false
-      const timeout = setTimeout(() => {
-        if (settled) return
-        settled = true
-        reject(
-          new Error(
-            "Nenhum peer disponível para baixar este arquivo. Verifique se alguém está online semeando.",
-          ),
-        )
-      }, 120000)
-
-      client.add(input.sourceMagnet, { path: networkDirectory }, (added) => {
-        added.on("done", () => {
-          if (settled) return
-          settled = true
-          clearTimeout(timeout)
-          resolvePromise(added)
-        })
-        added.on("error", (err) => {
-          if (settled) return
-          settled = true
-          clearTimeout(timeout)
-          reject(err instanceof Error ? err : new Error(String(err)))
-        })
-      })
-    })
-
     // filename vem da metadata do hub (fonte não confiável) — sanitiza antes
     // de compor o caminho para não escapar do diretório da rede.
     const safeFilename = sanitizeFilename(input.filename)
     const destinationPath = join(networkDirectory, safeFilename)
+
+    const transferId = randomUUID()
+    const startedAt = new Date().toISOString()
+
+    // Registra a transferência como "em andamento" antes de aguardar o download,
+    // para que a aba Transferências reflita o estado (e o resultado final, mesmo
+    // que falhe/expire).
+    const baseTransfer: TorrentTransfer = {
+      id: transferId,
+      direction: "download",
+      status: "starting",
+      networkId: input.networkId,
+      networkTitle: input.networkTitle,
+      filename: safeFilename,
+      infoHash: "",
+      magnet: input.sourceMagnet,
+      sourcePath: input.sourceMagnet,
+      destinationPath,
+      size: 0,
+      progress: 0,
+      startedAt,
+      completedAt: null,
+      error: null,
+    }
+    await this.transferStore.save(baseTransfer)
+
+    let torrent: Torrent
+    try {
+      torrent = await new Promise<Torrent>((resolvePromise, reject) => {
+        let settled = false
+        const timeout = setTimeout(() => {
+          if (settled) return
+          settled = true
+          reject(
+            new Error(
+              "Nenhum peer disponível para baixar este arquivo. Verifique se alguém está online semeando.",
+            ),
+          )
+        }, 120000)
+
+        const settle = (added: Torrent) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeout)
+          resolvePromise(added)
+        }
+        const fail = (err: unknown) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timeout)
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
+
+        client.add(input.sourceMagnet, { path: networkDirectory }, (added) => {
+          // Se o conteúdo já está completo no store (download instantâneo ou
+          // arquivo já baixado), o WebTorrent emite 'done' durante o 'ready' —
+          // antes de registrarmos o listener. Checamos a flag para não perder.
+          if (added.done) {
+            settle(added)
+            return
+          }
+          added.on("done", () => settle(added))
+          added.on("error", (err) => fail(err))
+        })
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      await this.transferStore.save({
+        ...baseTransfer,
+        status: "failed",
+        completedAt: new Date().toISOString(),
+        error: message,
+      })
+      throw err
+    }
+
     const resource: TorrentResource = {
       filename: safeFilename,
       size: torrent.length,
@@ -144,19 +190,12 @@ export class WebTorrentEngine implements TorrentEngine {
     }
 
     const transfer: TorrentTransfer = {
-      id: transferId,
-      direction: "download",
+      ...baseTransfer,
       status: "completed",
-      networkId: input.networkId,
-      networkTitle: input.networkTitle,
-      filename: safeFilename,
       infoHash: torrent.infoHash,
       magnet: torrent.magnetURI,
-      sourcePath: input.sourceMagnet,
-      destinationPath,
       size: torrent.length,
       progress: 1,
-      startedAt,
       completedAt: new Date().toISOString(),
       error: null,
     }

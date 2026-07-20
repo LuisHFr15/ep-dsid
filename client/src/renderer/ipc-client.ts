@@ -56,7 +56,7 @@ export const api = {
   listVersions: (networkId: string) => invoke<FileVersionsResult>("files:listVersions", networkId),
   promoteVersion: (networkId: string, versionId: string) => invoke<void>("files:promote", networkId, versionId),
   publishLocal: (networkId: string, sourceFilePath: string) => invoke<unknown>("files:publishLocal", networkId, sourceFilePath),
-  downloadCurrent: (networkId: string) => invoke<unknown>("files:downloadCurrent", networkId),
+  downloadCurrent: (networkId: string) => invoke<DownloadResult>("files:downloadCurrent", networkId),
 
   openFilePicker: () => invoke<string | null>("dialog:openFile"),
   copyToClipboard: (text: string) => invoke<null>("clipboard:write", text),
@@ -77,6 +77,17 @@ export type WorkspaceStatus = {
   configured: boolean
   rootDirectory: string | null
   directoryExists: boolean
+}
+
+export type DownloadResult = {
+  networkId: string
+  networkTitle: string
+  filename: string
+  size: number
+  sourcePath: string
+  destinationPath: string
+  versionId: string
+  transferId: string
 }
 
 export type TransferView = {

@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useInterval } from '../hooks/useInterval'
 import { VersionTree } from '../components/VersionTree'
-import { api } from '../ipc-client'
+import { api, type DownloadResult } from '../ipc-client'
 import type { Network, FileVersion, FileVersionsResult, NetworkAccessRequest, ActivePeer } from '../types'
-import { Button, Card, Badge, Tabs, Spinner, EmptyState, useToast, type TabItem } from '../components/ui'
+import { Button, Card, Badge, Tabs, Spinner, EmptyState, Modal, useToast, type TabItem } from '../components/ui'
 
 type Tab = 'arquivo' | 'versoes' | 'peers' | 'acesso'
 
@@ -21,6 +21,7 @@ export function NetworkDetailPage() {
   const [accessRequests, setAccessRequests] = useState<NetworkAccessRequest[]>([])
   const [peers, setPeers] = useState<ActivePeer[]>([])
   const [joined, setJoined] = useState(false)
+  const [downloadResult, setDownloadResult] = useState<DownloadResult | null>(null)
   const [tab, setTab] = useState<Tab>('arquivo')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,9 +93,9 @@ export function NetworkDetailPage() {
     if (!id) return
     setBusy(true)
     try {
-      await api.downloadCurrent(id)
+      const result = await api.downloadCurrent(id)
       setJoined(true) // baixar entra na rede
-      toast('Download concluído no seu workspace.', 'success')
+      setDownloadResult(result)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Erro ao baixar', 'error')
     } finally {
@@ -139,6 +140,15 @@ export function NetworkDetailPage() {
     try {
       await api.copyToClipboard(currentFile.magnet)
       toast('Magnet copiado para a área de transferência.', 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Erro ao copiar', 'error')
+    }
+  }
+
+  async function handleCopyPath(path: string) {
+    try {
+      await api.copyToClipboard(path)
+      toast('Caminho copiado para a área de transferência.', 'success')
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Erro ao copiar', 'error')
     }
@@ -295,6 +305,29 @@ export function NetworkDetailPage() {
             ))}
           </div>
         )
+      )}
+
+      {downloadResult && (
+        <Modal title="Download concluído" onClose={() => setDownloadResult(null)}>
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium">{downloadResult.filename}</p>
+              <p className="text-xs text-[var(--color-muted)]">{formatBytes(downloadResult.size)}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-[var(--color-muted)]">Salvo em:</p>
+              <p className="break-all rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-mono text-[11px]">
+                {downloadResult.destinationPath}
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="subtle" onClick={() => handleCopyPath(downloadResult.destinationPath)}>
+                Copiar caminho
+              </Button>
+              <Button onClick={() => setDownloadResult(null)}>Fechar</Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )
