@@ -40,12 +40,20 @@ export function NetworkDetailPage() {
       if (!found) { navigate('/networks'); return }
       setNetwork(found)
       if (found.activeFileId) {
-        const [file, versions] = await Promise.all([
-          api.getCurrentFile(id) as Promise<FileVersion>,
-          api.listVersions(id),
-        ])
-        setCurrentFile(file)
-        setVersionsResult(versions)
+        try {
+          const [file, versions] = await Promise.all([
+            api.getCurrentFile(id) as Promise<FileVersion>,
+            api.listVersions(id),
+          ])
+          setCurrentFile(file)
+          setVersionsResult(versions)
+        } catch {
+          // Sem acesso ao conteúdo (ex: não-membro de rede privada) não pode
+          // derrubar a página — ela ainda precisa renderizar para permitir
+          // "Pedir acesso". Arquivo/versões ficam vazios até o acesso ser dado.
+          setCurrentFile(null)
+          setVersionsResult(null)
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar')
