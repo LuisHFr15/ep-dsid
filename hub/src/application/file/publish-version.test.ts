@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { PublishVersion } from "./publish-version";
 import { ForbiddenError, NotFoundError } from "../../domain/errors/domain-error";
 import { createMembership } from "../../domain/network/membership";
-import { createNetwork, UpdateMode } from "../../domain/network/network";
+import { AccessMode, createNetwork, UpdateMode } from "../../domain/network/network";
 import {
   FakeLamportClock,
   InMemoryFileVersionRepository,
@@ -10,7 +10,7 @@ import {
   InMemoryNetworkRepository,
 } from "../../testing/in-memory-repositories";
 
-async function setup(updateMode: UpdateMode = "collaborative") {
+async function setup(updateMode: UpdateMode = "collaborative", accessMode: AccessMode = "private") {
   const networks = new InMemoryNetworkRepository();
   const memberships = new InMemoryMembershipRepository();
   const versions = new InMemoryFileVersionRepository();
@@ -19,7 +19,7 @@ async function setup(updateMode: UpdateMode = "collaborative") {
     title: "docs",
     description: "",
     ownerId: "alice",
-    accessMode: "private",
+    accessMode,
     updateMode,
   });
   await networks.save(network);
@@ -131,6 +131,17 @@ describe("PublishVersion", () => {
     await expect(
       publish.execute({ networkId: network.id, authorId: "carol", infoHash: "h", filename: "a" }),
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("allows any authenticated user to publish in a public network", async () => {
+    const { publish, network } = await setup("collaborative", "public");
+    const result = await publish.execute({
+      networkId: network.id,
+      authorId: "carol", // não é owner nem membro
+      infoHash: "h",
+      filename: "a",
+    });
+    expect(result.versionId).toBeTruthy();
   });
 
   it("fails for an unknown network", async () => {

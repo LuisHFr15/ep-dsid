@@ -32,6 +32,12 @@ export async function assertCanContribute(
   if (network.ownerId === userId) {
     return;
   }
+  // Rede pública é aberta: assim como qualquer autenticado pode ler/baixar
+  // (assertCanRead), qualquer autenticado pode contribuir. Sem isso, um não-owner
+  // nunca conseguiria publicar numa rede pública (ninguém vira membro aprovado lá).
+  if (network.accessMode === "public") {
+    return;
+  }
   if (network.updateMode === "centralized") {
     throw new ForbiddenError("only the owner can publish in centralized mode");
   }
